@@ -1,6 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const db = require('../db');
+const { weatherSnapshotForCompany } = require('../lib/weather');
 
 const router = express.Router();
 
@@ -77,7 +78,7 @@ function extractTicketText(message) {
   return (before + after).replace(/\s+/g, ' ').trim();
 }
 
-function createTicketFromLine({ title, description, company, reporterNote }) {
+async function createTicketFromLine({ title, description, company, reporterNote }) {
   const result = db
     .prepare(
       `INSERT INTO tickets (title, description, assignee, company, status, priority)
@@ -87,6 +88,10 @@ function createTicketFromLine({ title, description, company, reporterNote }) {
   const ticketId = result.lastInsertRowid;
   if (reporterNote) {
     db.prepare('INSERT INTO ticket_notes (ticket_id, note) VALUES (?, ?)').run(ticketId, reporterNote);
+  }
+  const weatherSnapshot = await weatherSnapshotForCompany(company);
+  if (weatherSnapshot) {
+    db.prepare('UPDATE tickets SET weather_snapshot = ? WHERE id = ?').run(weatherSnapshot, ticketId);
   }
   return db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
 }
@@ -128,7 +133,7 @@ router.post('/line', async (req, res) => {
       const title = ticketText.length > 80 ? `${ticketText.slice(0, 80)}…` : ticketText;
       const reporterNote = `แจ้งจาก LINE กลุ่ม${groupName ? ` "${groupName}"` : ''}${reporterName ? ` โดย ${reporterName}` : ''}: ${ticketText}`;
 
-      const ticket = createTicketFromLine({
+      const ticket = await createTicketFromLine({
         title,
         description: ticketText,
         company: groupName,

@@ -705,6 +705,12 @@ async function openTicketModal(id) {
             <span class="field-label">✏️ อัปเดตล่าสุด</span>
             <span class="field-static" id="modal-updated-at">${formatDateTime(t.updated_at)}</span>
           </div>
+          ${t.weather_snapshot ? `
+            <div class="field-row">
+              <span class="field-label">🌤️ อากาศตอนเปิด</span>
+              <span class="field-static">${escapeHtml(t.weather_snapshot)}</span>
+            </div>
+          ` : ''}
         </div>
 
         <div class="task-description">
@@ -886,6 +892,7 @@ function refreshAll() {
   loadTickets();
   loadDashboard();
   loadPendingBanner();
+  loadCompanyOptions();
 }
 
 async function autoSaveTicket(ticketId) {
@@ -928,6 +935,7 @@ async function autoSaveTicket(ticketId) {
   loadTickets();
   loadDashboard();
   loadPendingBanner();
+  loadCompanyOptions();
 }
 
 // ---- Knowledge Base ----
@@ -1073,12 +1081,19 @@ async function loadKbRecommendation(ticket) {
   resultEl.innerHTML = html;
 }
 
-// ---- Company autocomplete (sourced from AnyDesk branch names) ----
+// ---- Company autocomplete (AnyDesk branch names + any company name
+// already typed on a past ticket, so a brand-new name you type once is
+// remembered as a suggestion from then on) ----
 async function loadCompanyOptions() {
-  const res = await fetch('/api/anydesk');
-  const stores = await res.json();
+  const [storesRes, companiesRes] = await Promise.all([
+    fetch('/api/anydesk'),
+    fetch('/api/tickets/meta/companies'),
+  ]);
+  const stores = await storesRes.json();
+  const pastCompanies = await companiesRes.json();
+  const names = new Set([...stores.map((s) => s.name), ...pastCompanies]);
   const datalist = document.getElementById('company-options');
-  datalist.innerHTML = stores.map((s) => `<option value="${escapeHtml(s.name)}"></option>`).join('');
+  datalist.innerHTML = [...names].sort().map((n) => `<option value="${escapeHtml(n)}"></option>`).join('');
 }
 
 // ---- Pending work banner ----

@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const db = require('../db');
+const { weatherSnapshotForCompany } = require('../lib/weather');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -58,6 +59,13 @@ router.get('/', (req, res) => {
   res.json(withAttachments);
 });
 
+router.get('/meta/companies', (req, res) => {
+  const rows = db
+    .prepare(`SELECT DISTINCT company FROM tickets WHERE company IS NOT NULL AND TRIM(company) != '' ORDER BY company`)
+    .all();
+  res.json(rows.map((r) => r.company));
+});
+
 router.get('/:id', (req, res) => {
   const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.id);
   if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
@@ -70,7 +78,7 @@ router.get('/:id', (req, res) => {
   res.json({ ...ticket, notes, attachments });
 });
 
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const { title, description = '', assignee = '', company = '', status = 'open', priority = 'medium' } = req.body;
   if (!title || !title.trim()) {
     return res.status(400).json({ error: 'title is required' });
@@ -88,6 +96,15 @@ router.post('/', (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     )
     .run(title.trim(), description, assignee, company, status, priority, resolvedAt);
+
+  // Best-effort weather snapshot for the branch at the moment the ticket
+  // was opened; a slow/failed lookup never blocks ticket creation for long
+  // (weatherSnapshotForCompany times out on its own and resolves to null).
+  const weatherSnapshot = await weatherSnapshotForCompany(company);
+  if (weatherSnapshot) {
+    db.prepare('UPDATE tickets SET weather_snapshot = ? WHERE id = ?').run(weatherSnapshot, result.lastInsertRowid);
+  }
+
   const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(ticket);
 });

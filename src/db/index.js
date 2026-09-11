@@ -34,7 +34,8 @@ db.exec(`
     priority TEXT NOT NULL DEFAULT 'medium',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-    resolved_at TEXT
+    resolved_at TEXT,
+    weather_snapshot TEXT
   );
 
   CREATE TABLE IF NOT EXISTS ticket_notes (
@@ -88,6 +89,9 @@ if (!anydeskColumns.some((c) => c.name === 'program')) {
 const ticketColumns = db.prepare('PRAGMA table_info(tickets)').all();
 if (!ticketColumns.some((c) => c.name === 'company')) {
   db.exec('ALTER TABLE tickets ADD COLUMN company TEXT');
+}
+if (!ticketColumns.some((c) => c.name === 'weather_snapshot')) {
+  db.exec('ALTER TABLE tickets ADD COLUMN weather_snapshot TEXT');
 }
 
 function seedAnydeskDirectory() {
