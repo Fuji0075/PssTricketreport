@@ -50,10 +50,15 @@ async function loadTickets() {
           · อัปเดตล่าสุด: ${formatDateTime(t.updated_at)}
         </p>
         ${t.description ? `<p>${escapeHtml(t.description)}</p>` : ''}
+        ${(t.attachments && t.attachments.length) ? `
+          <div class="attachment-thumbs">
+            ${t.attachments.map((a) => `<a href="uploads/${a.filename}" target="_blank"><img src="uploads/${a.filename}" alt="${escapeHtml(a.original_name)}" class="thumb" /></a>`).join('')}
+          </div>` : ''}
       </div>
       <div class="ticket-actions">
         <button class="secondary edit-btn" data-id="${t.id}">แก้ไข</button>
         <button class="secondary note-btn" data-id="${t.id}">+ Note</button>
+        <button class="secondary photo-btn" data-id="${t.id}">+ รูป</button>
         <button class="secondary delete-btn" data-id="${t.id}">ลบ</button>
       </div>
     </div>
@@ -120,6 +125,26 @@ document.getElementById('ticket-list').addEventListener('click', async (e) => {
     submitBtn.textContent = 'บันทึกการแก้ไข';
     cancelEditBtn.style.display = 'inline-block';
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
+  if (e.target.classList.contains('photo-btn')) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async () => {
+      if (!input.files.length) return;
+      const formData = new FormData();
+      formData.append('image', input.files[0]);
+      const res = await fetch(`/api/tickets/${id}/attachments`, { method: 'POST', body: formData });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || 'อัปโหลดรูปไม่สำเร็จ');
+        return;
+      }
+      loadTickets();
+    };
+    input.click();
     return;
   }
 
@@ -226,6 +251,72 @@ document.getElementById('import-btn').addEventListener('click', async () => {
   loadTickets();
 });
 
+// ---- AnyDesk directory ----
+async function loadAnydesk() {
+  const q = document.getElementById('anydesk-search').value;
+  const res = await fetch(`/api/anydesk${q ? `?q=${encodeURIComponent(q)}` : ''}`);
+  const stores = await res.json();
+  const el = document.getElementById('anydesk-list');
+  if (stores.length === 0) {
+    el.innerHTML = '<div class="empty">ไม่พบสาขา</div>';
+    return;
+  }
+  el.innerHTML = stores.map((s) => `
+    <div class="card">
+      <h4 style="margin:0 0 6px">${escapeHtml(s.name)}</h4>
+      ${s.note ? `<p class="hint">${escapeHtml(s.note)}</p>` : ''}
+      <div class="anydesk-devices">
+        ${s.devices.map((d) => `
+          <div class="anydesk-device">
+            <span>${escapeHtml(d.label)}</span>
+            <code>${escapeHtml(d.device_id)}</code>
+            <button class="secondary copy-btn" data-value="${escapeHtml(d.device_id)}">คัดลอก</button>
+          </div>
+        `).join('') || '<span class="hint">ไม่มี ID</span>'}
+      </div>
+    </div>
+  `).join('');
+}
+
+document.getElementById('anydesk-search').addEventListener('input', () => {
+  clearTimeout(window.__anydeskDebounce);
+  window.__anydeskDebounce = setTimeout(loadAnydesk, 200);
+});
+
+document.getElementById('anydesk-list').addEventListener('click', (e) => {
+  if (e.target.classList.contains('copy-btn')) {
+    const value = e.target.dataset.value;
+    navigator.clipboard.writeText(value).then(() => {
+      const original = e.target.textContent;
+      e.target.textContent = 'คัดลอกแล้ว!';
+      setTimeout(() => { e.target.textContent = original; }, 1200);
+    }).catch(() => alert(`ID: ${value}`));
+  }
+});
+
+// ---- Pending work banner ----
+async function loadPendingBanner() {
+  const res = await fetch('/api/summary/pending?staleDays=2');
+  const data = await res.json();
+  const banner = document.getElementById('pending-banner');
+  if (data.count === 0) {
+    banner.style.display = 'none';
+    return;
+  }
+  banner.style.display = 'block';
+  banner.innerHTML = `
+    <strong>⚠ มี ${data.count} ticket ที่ค้างอยู่เกิน ${data.staleDays} วัน</strong>
+    <ul style="margin:8px 0 0; padding-left:20px;">
+      ${data.tickets.slice(0, 5).map((t) => `
+        <li>#${t.id} ${escapeHtml(t.title)} — <span class="badge ${t.status}">${statusLabel[t.status]}</span> ค้างมา ${t.days_stale} วัน</li>
+      `).join('')}
+      ${data.tickets.length > 5 ? `<li>และอีก ${data.tickets.length - 5} รายการ...</li>` : ''}
+    </ul>
+  `;
+}
+
 // ---- Init ----
 loadTickets();
 loadSummary();
+loadAnydesk();
+loadPendingBanner();

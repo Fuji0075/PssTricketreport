@@ -99,3 +99,23 @@ button:hover { opacity: 0.9; }
 .empty { color: var(--muted); font-style: italic; padding: 12px 0; }
 
 .hint { font-size: 0.8rem; color: var(--muted); }
+
+.attachment-thumbs { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.thumb {
+  width: 64px; height: 64px; object-fit: cover; border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.anydesk-devices { display: flex; flex-direction: column; gap: 6px; }
+.anydesk-device {
+  display: flex; align-items: center; gap: 10px; font-size: 0.85rem;
+  border-bottom: 1px solid var(--border); padding-bottom: 6px;
+}
+.anydesk-device:last-child { border-bottom: none; padding-bottom: 0; }
+.anydesk-device span { min-width: 70px; color: var(--muted); }
+.anydesk-device code {
+  background: var(--bg); padding: 2px 8px; border-radius: 4px; flex: 1;
+}
+
+#pending-banner { border-width: 2px; }
+#pending-banner ul { list-style: disc; }

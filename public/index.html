@@ -14,8 +14,11 @@
     <div class="tabs">
       <button class="tab-btn active" data-tab="tickets">Tickets</button>
       <button class="tab-btn" data-tab="summary">สรุปรายวัน</button>
+      <button class="tab-btn" data-tab="anydesk">AnyDesk</button>
       <button class="tab-btn" data-tab="import">นำเข้าไฟล์</button>
     </div>
+
+    <div id="pending-banner" class="card" style="display:none; border-color:#e8590c;"></div>
 
     <div id="tab-tickets" class="tab-panel active">
       <div class="card">
@@ -60,6 +63,17 @@
       </div>
 
       <div id="ticket-list" class="ticket-list"></div>
+    </div>
+
+    <div id="tab-anydesk" class="tab-panel">
+      <div class="card">
+        <h3>AnyDesk Directory</h3>
+        <p class="hint">ค้นหา ID AnyDesk ของแต่ละสาขาได้ที่นี่ ไม่ต้องเปิดไฟล์ Excel</p>
+        <div class="form-row">
+          <input type="text" id="anydesk-search" placeholder="ค้นหาชื่อสาขา..." />
+        </div>
+      </div>
+      <div id="anydesk-list"></div>
     </div>
 
     <div id="tab-summary" class="tab-panel">

@@ -49,6 +49,16 @@ router.get('/daily', (req, res) => {
     .prepare(`SELECT status, COUNT(*) AS count FROM tickets GROUP BY status`)
     .all();
 
+  const staleDays = Number(req.query.staleDays) || 2;
+  const pending = db
+    .prepare(
+      `SELECT *, CAST(julianday('now') - julianday(updated_at) AS INTEGER) AS days_stale
+       FROM tickets
+       WHERE status != 'done' AND julianday('now') - julianday(updated_at) >= ?
+       ORDER BY updated_at ASC`
+    )
+    .all(staleDays);
+
   res.json({
     date,
     createdCount: created.length,
@@ -59,7 +69,21 @@ router.get('/daily', (req, res) => {
     notes: notesToday,
     touchedTickets: touched,
     overallStatusCounts: statusCounts,
+    pendingTickets: pending,
   });
+});
+
+router.get('/pending', (req, res) => {
+  const staleDays = Number(req.query.staleDays) || 2;
+  const pending = db
+    .prepare(
+      `SELECT *, CAST(julianday('now') - julianday(updated_at) AS INTEGER) AS days_stale
+       FROM tickets
+       WHERE status != 'done' AND julianday('now') - julianday(updated_at) >= ?
+       ORDER BY updated_at ASC`
+    )
+    .all(staleDays);
+  res.json({ staleDays, count: pending.length, tickets: pending });
 });
 
 module.exports = router;
