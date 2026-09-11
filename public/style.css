@@ -381,10 +381,10 @@ button.secondary:hover { background: var(--bg); border-color: var(--primary); co
 .modal.modal-wide { max-width: 960px; padding: 0; overflow: hidden; }
 .modal.modal-wide .modal-close { z-index: 2; }
 
-.task-view { display: grid; grid-template-columns: 1.55fr 1fr; max-height: 82vh; }
-@media (max-width: 760px) { .task-view { grid-template-columns: 1fr; max-height: none; } }
+.task-view { display: grid; grid-template-columns: 1.55fr 1fr; height: 82vh; }
+@media (max-width: 760px) { .task-view { grid-template-columns: 1fr; height: auto; } }
 
-.task-main { padding: 22px 24px; overflow-y: auto; }
+.task-main { padding: 22px 24px; overflow-y: auto; min-height: 0; }
 .task-breadcrumb { color: var(--muted); font-size: 0.78rem; font-weight: 600; margin-bottom: 6px; }
 .save-status { color: var(--done); font-weight: 700; margin-left: 6px; }
 
