@@ -82,7 +82,7 @@ async function loadTickets() {
           ${escapeHtml(t.title)}
         </p>
         <p class="ticket-meta">
-          #${t.id} · ผู้รับผิดชอบ: ${escapeHtml(t.assignee || '-')} · priority: ${t.priority}
+          #${t.id} · ผู้รับผิดชอบ: ${escapeHtml(t.assignee || '-')}${t.company ? ` · ${escapeHtml(t.company)}` : ''} · priority: ${t.priority}
           · อัปเดตล่าสุด: ${formatDateTime(t.updated_at)}
         </p>
         ${t.description ? `<p>${escapeHtml(t.description)}</p>` : ''}
@@ -107,6 +107,7 @@ ticketForm.addEventListener('submit', async (e) => {
     title: document.getElementById('title').value,
     description: document.getElementById('description').value,
     assignee: document.getElementById('assignee').value,
+    company: document.getElementById('company').value,
     status: document.getElementById('status').value,
     priority: document.getElementById('priority').value,
   };
@@ -155,6 +156,7 @@ document.getElementById('ticket-list').addEventListener('click', async (e) => {
     document.getElementById('title').value = t.title;
     document.getElementById('description').value = t.description || '';
     document.getElementById('assignee').value = t.assignee || '';
+    document.getElementById('company').value = t.company || '';
     document.getElementById('status').value = t.status;
     document.getElementById('priority').value = t.priority;
     formTitle.textContent = `แก้ไข Ticket #${t.id}`;
@@ -455,6 +457,7 @@ function openAnydeskStoreModal(store) {
     }
     closeModal();
     loadAnydesk();
+    loadCompanyOptions();
   };
 }
 
@@ -523,9 +526,12 @@ function renderBoardCard(t) {
   const nextStatus = ADVANCE_MAP[t.status];
   const advanceLabel = t.status === 'on-hold' ? '▶ กลับมาทำ' : (nextStatus ? `→ ${statusLabel[nextStatus]}` : '');
   const showHold = t.status === 'open' || t.status === 'in-progress';
+  const cover = (t.attachments && t.attachments.length) ? t.attachments[0] : null;
   return `
     <div class="board-card" data-id="${t.id}">
+      ${cover ? `<img src="uploads/${cover.filename}" class="card-cover lightbox-img" data-full="uploads/${cover.filename}" alt="${escapeHtml(cover.original_name || '')}" />` : ''}
       <p class="card-title">${escapeHtml(t.title)}</p>
+      ${t.company ? `<p class="card-company">🏢 ${escapeHtml(t.company)}</p>` : ''}
       <p class="card-meta">
         <span><span class="priority-dot priority-${t.priority}"></span>#${t.id} ${escapeHtml(t.assignee || '-')}</span>
         <span>${formatDateTime(t.updated_at).slice(5)}</span>
@@ -543,7 +549,14 @@ document.getElementById('board').addEventListener('click', async (e) => {
   const advanceBtn = e.target.closest('.advance-btn');
   const holdBtn = e.target.closest('.hold-btn');
   const deleteBtn = e.target.closest('.delete-card-btn');
+  const coverImg = e.target.closest('.card-cover');
   const card = e.target.closest('.board-card');
+
+  if (coverImg) {
+    // Let the document-level lightbox handler show the photo, but don't
+    // also open the ticket detail modal underneath it.
+    return;
+  }
 
   if (advanceBtn) {
     e.stopPropagation();
@@ -594,6 +607,7 @@ function openCreateTicketModal() {
       <input type="text" id="modal-new-assignee" placeholder="ผู้รับผิดชอบ" />
     </div>
     <div class="form-row">
+      <input type="text" id="modal-new-company" placeholder="บริษัท / สาขา" list="company-options" />
       <select id="modal-new-status">
         ${STATUS_ORDER.map((s) => `<option value="${s}">${statusLabel[s]}</option>`).join('')}
       </select>
@@ -620,6 +634,7 @@ function openCreateTicketModal() {
     const payload = {
       title,
       assignee: document.getElementById('modal-new-assignee').value,
+      company: document.getElementById('modal-new-company').value,
       status: document.getElementById('modal-new-status').value,
       priority: document.getElementById('modal-new-priority').value,
       description: document.getElementById('modal-new-description').value,
@@ -673,6 +688,10 @@ async function openTicketModal(id) {
             <input type="text" id="modal-assignee" class="field-value" value="${escapeHtml(t.assignee || '')}" placeholder="ยังไม่ระบุ" />
           </div>
           <div class="field-row">
+            <span class="field-label">🏢 บริษัท/สาขา</span>
+            <input type="text" id="modal-company" class="field-value" value="${escapeHtml(t.company || '')}" placeholder="ยังไม่ระบุ" list="company-options" />
+          </div>
+          <div class="field-row">
             <span class="field-label">🚩 Priority</span>
             <select id="modal-priority" class="field-value">
               ${['low', 'medium', 'high', 'urgent'].map((p) => `<option value="${p}" ${p === t.priority ? 'selected' : ''}>${p}</option>`).join('')}
@@ -691,6 +710,14 @@ async function openTicketModal(id) {
         <div class="task-description">
           <label>รายละเอียด</label>
           <textarea id="modal-description" placeholder="เพิ่มรายละเอียด...">${escapeHtml(t.description || '')}</textarea>
+        </div>
+
+        <div class="task-kb-suggest">
+          <div class="kb-suggest-header">
+            <label>💡 คำแนะนำจากระบบ</label>
+            <button type="button" class="secondary" id="modal-kb-recommend-btn">ค้นหาคำแนะนำ</button>
+          </div>
+          <div id="modal-kb-result"></div>
         </div>
 
         <div class="task-attachments">
@@ -757,7 +784,10 @@ async function openTicketModal(id) {
   document.getElementById('modal-created-at').addEventListener('change', autoSave);
   titleTextarea.addEventListener('blur', autoSave);
   document.getElementById('modal-assignee').addEventListener('blur', autoSave);
+  document.getElementById('modal-company').addEventListener('blur', autoSave);
   document.getElementById('modal-description').addEventListener('blur', autoSave);
+
+  document.getElementById('modal-kb-recommend-btn').onclick = () => loadKbRecommendation(t);
 
   document.getElementById('modal-delete-btn').onclick = async () => {
     if (!confirm('ยืนยันลบ ticket นี้?')) return;
@@ -866,6 +896,7 @@ async function autoSaveTicket(ticketId) {
   const payload = {
     title: document.getElementById('modal-title').value,
     assignee: document.getElementById('modal-assignee').value,
+    company: document.getElementById('modal-company').value,
     status: document.getElementById('modal-status').value,
     priority: document.getElementById('modal-priority').value,
     description: document.getElementById('modal-description').value,
@@ -899,6 +930,157 @@ async function autoSaveTicket(ticketId) {
   loadPendingBanner();
 }
 
+// ---- Knowledge Base ----
+async function loadKb() {
+  const q = document.getElementById('kb-search').value;
+  const res = await fetch(`/api/kb${q ? `?q=${encodeURIComponent(q)}` : ''}`);
+  const articles = await res.json();
+  window.__allKb = articles;
+  const el = document.getElementById('kb-list');
+  if (articles.length === 0) {
+    el.innerHTML = '<div class="empty">ยังไม่มีบทความ Knowledge Base — เพิ่มปัญหาที่เคยเจอไว้ ระบบจะแนะนำให้อัตโนมัติตอนเปิด ticket ใหม่</div>';
+    return;
+  }
+  el.innerHTML = articles.map((a) => `
+    <div class="card kb-card" data-id="${a.id}">
+      <h4 style="margin:0 0 6px">${escapeHtml(a.title)}</h4>
+      ${a.problem ? `<p class="hint"><strong>อาการ:</strong> ${escapeHtml(a.problem)}</p>` : ''}
+      <p class="kb-solution">${escapeHtml(a.solution).replace(/\n/g, '<br>')}</p>
+      ${a.tags ? `<p class="hint">🏷️ ${escapeHtml(a.tags)}</p>` : ''}
+      <div class="kb-card-actions">
+        <button class="secondary kb-edit-btn" data-id="${a.id}">แก้ไข</button>
+        <button class="secondary kb-delete-btn" data-id="${a.id}">ลบ</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+document.getElementById('kb-search').addEventListener('input', () => {
+  clearTimeout(window.__kbDebounce);
+  window.__kbDebounce = setTimeout(loadKb, 200);
+});
+
+document.getElementById('kb-list').addEventListener('click', async (e) => {
+  const editBtn = e.target.closest('.kb-edit-btn');
+  const deleteBtn = e.target.closest('.kb-delete-btn');
+
+  if (editBtn) {
+    const article = (window.__allKb || []).find((a) => String(a.id) === editBtn.dataset.id);
+    if (article) openKbModal(article);
+    return;
+  }
+
+  if (deleteBtn) {
+    if (!confirm('ยืนยันลบบทความนี้?')) return;
+    await fetch(`/api/kb/${deleteBtn.dataset.id}`, { method: 'DELETE' });
+    loadKb();
+  }
+});
+
+document.getElementById('kb-add-btn').addEventListener('click', () => openKbModal(null));
+
+function openKbModal(article) {
+  const isEdit = !!article;
+  currentModalTicketId = null;
+  document.querySelector('.modal').classList.remove('modal-wide');
+  modalBody.innerHTML = `
+    <h3>${isEdit ? 'แก้ไขบทความ' : 'เพิ่มบทความใหม่'}</h3>
+    <div class="form-row">
+      <input type="text" id="kb-modal-title" placeholder="หัวข้อปัญหา *" value="${isEdit ? escapeHtml(article.title) : ''}" />
+    </div>
+    <div class="form-row">
+      <textarea id="kb-modal-problem" placeholder="อาการ / สิ่งที่พบ">${isEdit ? escapeHtml(article.problem || '') : ''}</textarea>
+    </div>
+    <div class="form-row">
+      <textarea id="kb-modal-solution" placeholder="วิธีแก้ไข (ขั้นตอน) *">${isEdit ? escapeHtml(article.solution) : ''}</textarea>
+    </div>
+    <div class="form-row">
+      <input type="text" id="kb-modal-tags" placeholder="แท็ก (คั่นด้วยจุลภาค เช่น printer, network)" value="${isEdit ? escapeHtml(article.tags || '') : ''}" />
+    </div>
+    <div class="form-row">
+      <button id="kb-modal-save-btn">${isEdit ? 'บันทึก' : 'เพิ่มบทความ'}</button>
+    </div>
+  `;
+  modalOverlay.style.display = 'flex';
+
+  document.getElementById('kb-modal-save-btn').onclick = async () => {
+    const title = document.getElementById('kb-modal-title').value.trim();
+    const solution = document.getElementById('kb-modal-solution').value.trim();
+    if (!title || !solution) {
+      alert('กรุณากรอกหัวข้อและวิธีแก้ไข');
+      return;
+    }
+    const payload = {
+      title,
+      problem: document.getElementById('kb-modal-problem').value.trim(),
+      solution,
+      tags: document.getElementById('kb-modal-tags').value.trim(),
+    };
+    const url = isEdit ? `/api/kb/${article.id}` : '/api/kb';
+    const method = isEdit ? 'PUT' : 'POST';
+    const r = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      alert(err.error || 'เกิดข้อผิดพลาด');
+      return;
+    }
+    closeModal();
+    loadKb();
+  };
+}
+
+async function loadKbRecommendation(ticket) {
+  const resultEl = document.getElementById('modal-kb-result');
+  if (!resultEl) return;
+  const title = document.getElementById('modal-title').value;
+  const description = document.getElementById('modal-description').value;
+  resultEl.innerHTML = '<p class="hint">กำลังค้นหาคำแนะนำ...</p>';
+  const res = await fetch('/api/kb/recommend', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, description }),
+  });
+  if (!res.ok) {
+    resultEl.innerHTML = '<p class="hint">ค้นหาคำแนะนำไม่สำเร็จ</p>';
+    return;
+  }
+  const data = await res.json();
+  let html = '';
+  if (data.aiAnswer) {
+    html += `
+      <div class="kb-ai-answer">
+        <div class="kb-ai-label">🤖 คำแนะนำจาก AI</div>
+        <div class="kb-ai-text">${escapeHtml(data.aiAnswer).replace(/\n/g, '<br>')}</div>
+      </div>
+    `;
+  } else if (!data.aiAvailable) {
+    html += `<p class="hint">ยังไม่ได้ตั้งค่า ANTHROPIC_API_KEY — แสดงเฉพาะบทความที่ใกล้เคียงจาก Knowledge Base ด้านล่าง (ตั้งค่า env var นี้เพื่อให้ AI ช่วยสรุปคำแนะนำ)</p>`;
+  }
+  if (data.matches && data.matches.length) {
+    html += `<div class="kb-matches">${data.matches.map((m) => `
+      <div class="kb-match-item">
+        <div class="kb-match-title">${escapeHtml(m.title)}</div>
+        <div class="kb-match-solution">${escapeHtml(m.solution).replace(/\n/g, '<br>')}</div>
+      </div>
+    `).join('')}</div>`;
+  } else if (!data.aiAnswer) {
+    html += '<p class="empty">ไม่พบบทความที่เกี่ยวข้องใน Knowledge Base ลองเพิ่มบทความใหม่หลังจากแก้ปัญหานี้ได้แล้ว</p>';
+  }
+  resultEl.innerHTML = html;
+}
+
+// ---- Company autocomplete (sourced from AnyDesk branch names) ----
+async function loadCompanyOptions() {
+  const res = await fetch('/api/anydesk');
+  const stores = await res.json();
+  const datalist = document.getElementById('company-options');
+  datalist.innerHTML = stores.map((s) => `<option value="${escapeHtml(s.name)}"></option>`).join('');
+}
+
 // ---- Pending work banner ----
 async function loadPendingBanner() {
   const res = await fetch('/api/summary/pending?staleDays=2');
@@ -928,4 +1110,6 @@ loadTickets();
 loadDashboard();
 loadSummary();
 loadAnydesk();
+loadKb();
+loadCompanyOptions();
 loadPendingBanner();

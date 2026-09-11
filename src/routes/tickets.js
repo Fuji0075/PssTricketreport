@@ -71,7 +71,7 @@ router.get('/:id', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const { title, description = '', assignee = '', status = 'open', priority = 'medium' } = req.body;
+  const { title, description = '', assignee = '', company = '', status = 'open', priority = 'medium' } = req.body;
   if (!title || !title.trim()) {
     return res.status(400).json({ error: 'title is required' });
   }
@@ -84,10 +84,10 @@ router.post('/', (req, res) => {
   const resolvedAt = status === 'done' ? new Date().toISOString() : null;
   const result = db
     .prepare(
-      `INSERT INTO tickets (title, description, assignee, status, priority, resolved_at)
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO tickets (title, description, assignee, company, status, priority, resolved_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
     )
-    .run(title.trim(), description, assignee, status, priority, resolvedAt);
+    .run(title.trim(), description, assignee, company, status, priority, resolvedAt);
   const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(ticket);
 });
@@ -109,6 +109,7 @@ router.put('/:id', (req, res) => {
   const title = req.body.title ?? existing.title;
   const description = req.body.description ?? existing.description;
   const assignee = req.body.assignee ?? existing.assignee;
+  const company = req.body.company ?? existing.company;
   const status = req.body.status ?? existing.status;
   const priority = req.body.priority ?? existing.priority;
 
@@ -136,9 +137,9 @@ router.put('/:id', (req, res) => {
   }
 
   db.prepare(
-    `UPDATE tickets SET title = ?, description = ?, assignee = ?, status = ?, priority = ?,
+    `UPDATE tickets SET title = ?, description = ?, assignee = ?, company = ?, status = ?, priority = ?,
      created_at = ?, resolved_at = ?, updated_at = datetime('now') WHERE id = ?`
-  ).run(title, description, assignee, status, priority, createdAt, resolvedAt, req.params.id);
+  ).run(title, description, assignee, company, status, priority, createdAt, resolvedAt, req.params.id);
 
   const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.id);
   res.json(ticket);
@@ -214,8 +215,8 @@ router.post('/import', upload.single('file'), (req, res) => {
   const rows = parseCsv(text);
 
   const insert = db.prepare(
-    `INSERT INTO tickets (title, description, assignee, status, priority, resolved_at)
-     VALUES (?, ?, ?, ?, ?, ?)`
+    `INSERT INTO tickets (title, description, assignee, company, status, priority, resolved_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
   );
 
   let imported = 0;
@@ -230,7 +231,7 @@ router.post('/import', upload.single('file'), (req, res) => {
       const status = VALID_STATUS.includes(row.status) ? row.status : 'open';
       const priority = VALID_PRIORITY.includes(row.priority) ? row.priority : 'medium';
       const resolvedAt = status === 'done' ? new Date().toISOString() : null;
-      insert.run(title, row.description || '', row.assignee || '', status, priority, resolvedAt);
+      insert.run(title, row.description || '', row.assignee || '', row.company || '', status, priority, resolvedAt);
       imported += 1;
     });
   });

@@ -248,6 +248,31 @@ button.secondary:hover { background: var(--bg); border-color: var(--primary); co
 .anydesk-card-actions button { padding: 6px 10px; font-size: 0.76rem; }
 .anydesk-delete-store-btn:hover { border-color: var(--danger); color: var(--danger); }
 
+/* ---- Knowledge Base ---- */
+.kb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.kb-solution { font-size: 0.85rem; white-space: pre-wrap; margin: 6px 0; }
+.kb-card-actions { display: flex; gap: 6px; margin-top: 10px; }
+.kb-card-actions button { padding: 6px 10px; font-size: 0.76rem; }
+
+.task-kb-suggest {
+  margin-bottom: 18px; border: 1px solid var(--border); border-radius: 10px; padding: 14px;
+  background: var(--bg);
+}
+.kb-suggest-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+.kb-suggest-header label { font-size: 0.8rem; font-weight: 700; color: var(--muted); }
+.kb-suggest-header button { padding: 6px 12px; font-size: 0.8rem; }
+
+.kb-ai-answer {
+  background: var(--primary-soft); border-radius: 8px; padding: 10px 12px; margin-top: 8px;
+}
+.kb-ai-label { font-size: 0.76rem; font-weight: 700; color: var(--primary); margin-bottom: 4px; }
+.kb-ai-text { font-size: 0.85rem; line-height: 1.5; }
+
+.kb-matches { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.kb-match-item { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+.kb-match-title { font-weight: 700; font-size: 0.82rem; margin-bottom: 3px; }
+.kb-match-solution { font-size: 0.8rem; color: var(--muted); }
+
 /* ---- Alert banner ---- */
 .alert-banner {
   background: var(--open-soft); border: 1px solid var(--open); border-radius: var(--radius);
@@ -307,7 +332,12 @@ button.secondary:hover { background: var(--bg); border-color: var(--primary); co
   box-shadow: var(--shadow); transition: box-shadow 0.12s, transform 0.12s, border-color 0.12s;
 }
 .board-card:hover { box-shadow: var(--shadow-hover); transform: translateY(-1px); border-color: var(--primary); }
+.card-cover {
+  display: block; width: calc(100% + 24px); height: 110px; object-fit: cover;
+  margin: -12px -12px 10px -12px; border-radius: 10px 10px 0 0; cursor: zoom-in;
+}
 .board-card .card-title { font-weight: 700; font-size: 0.88rem; margin: 0 0 8px; line-height: 1.35; }
+.card-company { font-size: 0.74rem; color: var(--primary); margin: -4px 0 8px; font-weight: 600; }
 .board-card .card-meta { font-size: 0.74rem; color: var(--muted); display: flex; justify-content: space-between; align-items: center; gap: 6px; }
 .board-card .priority-dot {
   display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px;

@@ -29,6 +29,7 @@ db.exec(`
     title TEXT NOT NULL,
     description TEXT,
     assignee TEXT,
+    company TEXT,
     status TEXT NOT NULL DEFAULT 'open',
     priority TEXT NOT NULL DEFAULT 'medium',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -65,12 +66,28 @@ db.exec(`
     label TEXT NOT NULL,
     device_id TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS kb_articles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    problem TEXT,
+    solution TEXT NOT NULL,
+    tags TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
 
 // Migration for databases created before the `program` column existed.
 const anydeskColumns = db.prepare('PRAGMA table_info(anydesk_stores)').all();
 if (!anydeskColumns.some((c) => c.name === 'program')) {
   db.exec("ALTER TABLE anydesk_stores ADD COLUMN program TEXT NOT NULL DEFAULT 'AnyDesk'");
+}
+
+// Migration for databases created before the `company` column existed.
+const ticketColumns = db.prepare('PRAGMA table_info(tickets)').all();
+if (!ticketColumns.some((c) => c.name === 'company')) {
+  db.exec('ALTER TABLE tickets ADD COLUMN company TEXT');
 }
 
 function seedAnydeskDirectory() {

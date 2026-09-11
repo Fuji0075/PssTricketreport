@@ -14,6 +14,9 @@
 - หน้าสรุปรายวัน: ticket ที่สร้างใหม่, ticket ที่ปิดแล้ว, บันทึกงานที่ทำ, และภาพรวมสถานะทั้งหมด
 - **แจ้งเตือนงานค้าง**: แบนเนอร์แจ้งเตือนอัตโนมัติเมื่อมี ticket ที่ยังไม่ปิดและไม่มีความเคลื่อนไหวเกิน 2 วัน
 - **หน้า AnyDesk Directory**: ค้นหา ID AnyDesk (Admin/Entry/Exit) ของแต่ละสาขาได้ในที่เดียว ไม่ต้องเปิดไฟล์ Excel แยก (seed ข้อมูลเริ่มต้นจาก `data/anydesk-directory.json`) พร้อม**เพิ่ม/แก้ไข/ลบสาขาและอุปกรณ์ได้ในหน้าเว็บ** และแท็กสี **"โปรแกรม"** (AnyDesk / PSS GO) บอกว่าสาขานั้นต้องเปิดโปรแกรมอะไรเพื่อรีโมทเข้า
+- **ฟิลด์บริษัท/สาขา** ตอนเปิด ticket ใหม่ — พิมพ์แล้วมี autocomplete จากรายชื่อสาขาใน AnyDesk Directory ให้เลือก แสดงเป็นแท็กสีม่วงบนการ์ด Dashboard ด้วย
+- **การ์ด Dashboard แสดงรูปภาพ**: ถ้า ticket มีรูปแนบ รูปแรกจะขึ้นเป็นภาพหน้าปกบนการ์ด คลิกดูแบบเต็มได้เลยโดยไม่ต้องเปิดหน้าต่างรายละเอียด
+- **Knowledge Base**: บันทึกปัญหาที่เคยเจอและวิธีแก้ไว้เป็นบทความ ค้นหาได้ และในหน้าต่างรายละเอียด ticket มีปุ่ม "ค้นหาคำแนะนำ" ที่จะจับคู่คำในหัวข้อ/รายละเอียด ticket กับบทความที่ใกล้เคียงให้อัตโนมัติ — ถ้าตั้งค่า environment variable `ANTHROPIC_API_KEY` ไว้ ระบบจะเรียก Claude ให้ช่วยสรุปคำแนะนำเป็นภาษาที่อ่านง่ายด้วย (ถ้าไม่ตั้งค่าไว้ก็ยังใช้งานได้ปกติ แค่แสดงเฉพาะบทความที่ใกล้เคียง)
 
 ## เริ่มต้นใช้งาน
 
@@ -34,8 +37,8 @@ npm start
 ## รูปแบบไฟล์ CSV สำหรับนำเข้า
 
 ```csv
-title,description,assignee,status,priority
-แก้บั๊ก X,รายละเอียด,ชื่อผู้รับผิดชอบ,open,medium
+title,description,assignee,company,status,priority
+แก้บั๊ก X,รายละเอียด,ชื่อผู้รับผิดชอบ,โรบินสัน ถลาง,open,medium
 ```
 
 - `status`: `open`, `in-progress`, `on-hold`, `done`
@@ -63,3 +66,24 @@ title,description,assignee,status,priority
 | POST | `/api/anydesk/:id/devices` | เพิ่มอุปกรณ์ AnyDesk ให้สาขา |
 | PUT | `/api/anydesk/devices/:deviceId` | แก้ไขชื่อ/ID อุปกรณ์ |
 | DELETE | `/api/anydesk/devices/:deviceId` | ลบอุปกรณ์ AnyDesk |
+| GET | `/api/kb?q=` | รายการบทความ Knowledge Base (ค้นหาด้วย `q`) |
+| POST | `/api/kb` | เพิ่มบทความใหม่ (`title`, `problem`, `solution`, `tags`) |
+| PUT | `/api/kb/:id` | แก้ไขบทความ |
+| DELETE | `/api/kb/:id` | ลบบทความ |
+| POST | `/api/kb/recommend` | หาคำแนะนำจาก `title`/`description` — จับคู่คำกับ Knowledge Base และเรียก Claude API (ถ้าตั้งค่า `ANTHROPIC_API_KEY`) เพื่อสรุปคำแนะนำ |
+
+### เปิดใช้ AI ช่วยแนะนำใน Knowledge Base (ไม่บังคับ)
+
+ตั้งค่า environment variable ก่อนรัน `npm start`:
+
+```bash
+# Windows (Command Prompt)
+set ANTHROPIC_API_KEY=your-api-key-here
+npm start
+
+# Windows (PowerShell)
+$env:ANTHROPIC_API_KEY="your-api-key-here"
+npm start
+```
+
+ถ้าไม่ตั้งค่าไว้ ปุ่ม "ค้นหาคำแนะนำ" จะยังทำงานได้ปกติ แค่แสดงเฉพาะบทความที่ใกล้เคียงจาก Knowledge Base โดยไม่มีสรุปจาก AI
