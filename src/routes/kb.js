@@ -61,6 +61,10 @@ const STOPWORDS = new Set([
   'ที่', 'และ', 'ของ', 'ใน', 'ให้', 'ได้', 'เป็น', 'มี', 'ไม่', 'จะ', 'แล้ว', 'ครับ', 'ค่ะ', 'กับ', 'ไป', 'มา',
 ]);
 
+// Word-boundary tokenizer: works for English (space-separated) but Thai is
+// written with no spaces between words, so a whole Thai phrase collapses
+// into one long "token" here — useless for exact-match comparison on its
+// own. Kept as one signal among several below, not the only one.
 function tokenize(text) {
   return String(text || '')
     .toLowerCase()
@@ -68,13 +72,46 @@ function tokenize(text) {
     .filter((tok) => tok.length >= 2 && !STOPWORDS.has(tok));
 }
 
-function scoreArticle(queryTokens, article) {
-  const articleTokens = tokenize(`${article.title} ${article.problem || ''} ${article.tags || ''}`);
-  const articleSet = new Set(articleTokens);
+// Character trigrams don't care about spaces at all, so they catch partial
+// overlaps between unsegmented Thai phrases (e.g. "เครื่องปริ้นเสีย" vs
+// "เครื่องพิมพ์เสีย" still share several 3-character chunks around "เสีย").
+function charTrigrams(text) {
+  const s = String(text || '').toLowerCase().replace(/\s+/g, '');
+  const grams = new Set();
+  if (s.length === 0) return grams;
+  if (s.length < 3) {
+    grams.add(s);
+    return grams;
+  }
+  for (let i = 0; i <= s.length - 3; i++) grams.add(s.slice(i, i + 3));
+  return grams;
+}
+
+function scoreArticle(ticketText, queryTokens, queryGrams, article) {
+  const articleText = `${article.title} ${article.problem || ''}`;
+  const tags = String(article.tags || '').split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
+  const ticketLower = ticketText.toLowerCase();
+
   let score = 0;
-  queryTokens.forEach((tok) => {
-    if (articleSet.has(tok)) score += 1;
+
+  // Strong signal: an explicit tag appears literally in the ticket text —
+  // substring search, so it works regardless of Thai word spacing.
+  tags.forEach((tag) => {
+    if (tag.length >= 2 && ticketLower.includes(tag)) score += 5;
   });
+
+  // Medium signal: exact word overlap (mainly helps English/mixed terms).
+  const articleTokens = new Set(tokenize(`${articleText} ${tags.join(' ')}`));
+  queryTokens.forEach((tok) => {
+    if (articleTokens.has(tok)) score += 2;
+  });
+
+  // Baseline signal: character-trigram overlap, robust to unsegmented Thai.
+  const articleGrams = charTrigrams(`${articleText} ${tags.join(' ')}`);
+  queryGrams.forEach((g) => {
+    if (articleGrams.has(g)) score += 1;
+  });
+
   return score;
 }
 
@@ -119,10 +156,12 @@ router.post('/recommend', async (req, res) => {
   if (!ticketText) return res.status(400).json({ error: 'title or description is required' });
 
   const queryTokens = tokenize(ticketText);
+  const queryGrams = charTrigrams(ticketText);
   const articles = db.prepare('SELECT * FROM kb_articles').all();
+  const MIN_SCORE = 3; // a couple of coincidental trigram hits shouldn't count as a match
   const matches = articles
-    .map((a) => ({ ...a, score: scoreArticle(queryTokens, a) }))
-    .filter((a) => a.score > 0)
+    .map((a) => ({ ...a, score: scoreArticle(ticketText, queryTokens, queryGrams, a) }))
+    .filter((a) => a.score >= MIN_SCORE)
     .sort((a, b) => b.score - a.score)
     .slice(0, 5);
 
