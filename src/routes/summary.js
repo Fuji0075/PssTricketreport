@@ -54,7 +54,7 @@ router.get('/daily', (req, res) => {
     .prepare(
       `SELECT *, CAST(julianday('now') - julianday(updated_at) AS INTEGER) AS days_stale
        FROM tickets
-       WHERE status != 'done' AND julianday('now') - julianday(updated_at) >= ?
+       WHERE status NOT IN ('done', 'on-hold') AND julianday('now') - julianday(updated_at) >= ?
        ORDER BY updated_at ASC`
     )
     .all(staleDays);
@@ -79,7 +79,7 @@ router.get('/pending', (req, res) => {
     .prepare(
       `SELECT *, CAST(julianday('now') - julianday(updated_at) AS INTEGER) AS days_stale
        FROM tickets
-       WHERE status != 'done' AND julianday('now') - julianday(updated_at) >= ?
+       WHERE status NOT IN ('done', 'on-hold') AND julianday('now') - julianday(updated_at) >= ?
        ORDER BY updated_at ASC`
     )
     .all(staleDays);

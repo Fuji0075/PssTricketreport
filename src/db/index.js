@@ -55,7 +55,8 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS anydesk_stores (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
-    note TEXT
+    note TEXT,
+    program TEXT NOT NULL DEFAULT 'AnyDesk'
   );
 
   CREATE TABLE IF NOT EXISTS anydesk_devices (
@@ -66,6 +67,12 @@ db.exec(`
   );
 `);
 
+// Migration for databases created before the `program` column existed.
+const anydeskColumns = db.prepare('PRAGMA table_info(anydesk_stores)').all();
+if (!anydeskColumns.some((c) => c.name === 'program')) {
+  db.exec("ALTER TABLE anydesk_stores ADD COLUMN program TEXT NOT NULL DEFAULT 'AnyDesk'");
+}
+
 function seedAnydeskDirectory() {
   const count = db.prepare('SELECT COUNT(*) AS c FROM anydesk_stores').get().c;
   if (count > 0) return;
@@ -74,14 +81,14 @@ function seedAnydeskDirectory() {
   if (!fs.existsSync(seedPath)) return;
 
   const stores = JSON.parse(fs.readFileSync(seedPath, 'utf-8'));
-  const insertStore = db.prepare('INSERT INTO anydesk_stores (name, note) VALUES (?, ?)');
+  const insertStore = db.prepare('INSERT INTO anydesk_stores (name, note, program) VALUES (?, ?, ?)');
   const insertDevice = db.prepare(
     'INSERT INTO anydesk_devices (store_id, label, device_id) VALUES (?, ?, ?)'
   );
 
   const seedAll = db.transaction((items) => {
     items.forEach((store) => {
-      const result = insertStore.run(store.name, store.note || null);
+      const result = insertStore.run(store.name, store.note || null, store.program || 'AnyDesk');
       (store.devices || []).forEach((d) => {
         insertDevice.run(result.lastInsertRowid, d.label, d.id);
       });

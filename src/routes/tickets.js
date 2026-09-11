@@ -28,7 +28,7 @@ const imageUpload = multer({
   limits: { fileSize: 8 * 1024 * 1024 },
 });
 
-const VALID_STATUS = ['open', 'in-progress', 'done'];
+const VALID_STATUS = ['open', 'in-progress', 'on-hold', 'done'];
 const VALID_PRIORITY = ['low', 'medium', 'high', 'urgent'];
 
 function serializeTicket(row) {

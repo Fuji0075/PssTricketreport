@@ -77,6 +77,7 @@
               <select id="status">
                 <option value="open">Open</option>
                 <option value="in-progress">In Progress</option>
+                <option value="on-hold">On Hold</option>
                 <option value="done">Done</option>
               </select>
               <select id="priority">
@@ -101,6 +102,7 @@
             <option value="">ทุกสถานะ</option>
             <option value="open">Open</option>
             <option value="in-progress">In Progress</option>
+            <option value="on-hold">On Hold</option>
             <option value="done">Done</option>
           </select>
           <button class="secondary" id="refresh-tickets">รีเฟรช</button>
@@ -110,9 +112,12 @@
       </div>
 
       <div id="tab-anydesk" class="tab-panel">
-        <div class="page-header">
-          <h1>AnyDesk Directory</h1>
-          <p class="subtitle">ค้นหา ID AnyDesk ของแต่ละสาขาได้ที่นี่ ไม่ต้องเปิดไฟล์ Excel</p>
+        <div class="page-header page-header-row">
+          <div>
+            <h1>AnyDesk Directory</h1>
+            <p class="subtitle">ค้นหา ID และโปรแกรมที่ต้องเข้าของแต่ละสาขา ไม่ต้องเปิดไฟล์ Excel</p>
+          </div>
+          <button id="anydesk-add-btn">+ เพิ่มสาขา</button>
         </div>
         <div class="card">
           <div class="form-row">

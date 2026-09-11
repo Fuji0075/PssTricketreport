@@ -1,4 +1,4 @@
-const statusLabel = { open: 'Open', 'in-progress': 'In Progress', done: 'Done' };
+const statusLabel = { open: 'Open', 'in-progress': 'In Progress', 'on-hold': 'On Hold', done: 'Done' };
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, (c) => ({
@@ -252,18 +252,28 @@ document.getElementById('import-btn').addEventListener('click', async () => {
 });
 
 // ---- AnyDesk directory ----
+const PROGRAM_OPTIONS = ['AnyDesk', 'PSS GO'];
+
+function programSlug(program) {
+  return String(program || 'AnyDesk').toLowerCase().replace(/\s+/g, '-');
+}
+
 async function loadAnydesk() {
   const q = document.getElementById('anydesk-search').value;
   const res = await fetch(`/api/anydesk${q ? `?q=${encodeURIComponent(q)}` : ''}`);
   const stores = await res.json();
+  window.__allAnydeskStores = stores;
   const el = document.getElementById('anydesk-list');
   if (stores.length === 0) {
     el.innerHTML = '<div class="empty">ไม่พบสาขา</div>';
     return;
   }
   el.innerHTML = stores.map((s) => `
-    <div class="card">
-      <h4 style="margin:0 0 6px">${escapeHtml(s.name)}</h4>
+    <div class="card anydesk-card" data-store-id="${s.id}">
+      <div class="anydesk-card-header">
+        <h4>${escapeHtml(s.name)}</h4>
+        <span class="program-badge program-${programSlug(s.program)}">${escapeHtml(s.program || 'AnyDesk')}</span>
+      </div>
       ${s.note ? `<p class="hint">${escapeHtml(s.note)}</p>` : ''}
       <div class="anydesk-devices">
         ${s.devices.map((d) => `
@@ -271,8 +281,15 @@ async function loadAnydesk() {
             <span>${escapeHtml(d.label)}</span>
             <code>${escapeHtml(d.device_id)}</code>
             <button class="secondary copy-btn" data-value="${escapeHtml(d.device_id)}">คัดลอก</button>
+            <button class="secondary device-edit-btn" data-device-id="${d.id}" data-store-id="${s.id}" title="แก้ไข">✎</button>
+            <button class="secondary device-delete-btn" data-device-id="${d.id}" data-store-id="${s.id}" title="ลบ">×</button>
           </div>
         `).join('') || '<span class="hint">ไม่มี ID</span>'}
+      </div>
+      <div class="anydesk-card-actions">
+        <button class="secondary anydesk-add-device-btn" data-store-id="${s.id}">+ อุปกรณ์</button>
+        <button class="secondary anydesk-edit-store-btn" data-store-id="${s.id}">แก้ไขสาขา</button>
+        <button class="secondary anydesk-delete-store-btn" data-store-id="${s.id}">ลบสาขา</button>
       </div>
     </div>
   `).join('');
@@ -283,19 +300,132 @@ document.getElementById('anydesk-search').addEventListener('input', () => {
   window.__anydeskDebounce = setTimeout(loadAnydesk, 200);
 });
 
-document.getElementById('anydesk-list').addEventListener('click', (e) => {
-  if (e.target.classList.contains('copy-btn')) {
-    const value = e.target.dataset.value;
+document.getElementById('anydesk-list').addEventListener('click', async (e) => {
+  const copyBtn = e.target.closest('.copy-btn');
+  const deviceEditBtn = e.target.closest('.device-edit-btn');
+  const deviceDeleteBtn = e.target.closest('.device-delete-btn');
+  const addDeviceBtn = e.target.closest('.anydesk-add-device-btn');
+  const editStoreBtn = e.target.closest('.anydesk-edit-store-btn');
+  const deleteStoreBtn = e.target.closest('.anydesk-delete-store-btn');
+
+  if (copyBtn) {
+    const value = copyBtn.dataset.value;
     navigator.clipboard.writeText(value).then(() => {
-      const original = e.target.textContent;
-      e.target.textContent = 'คัดลอกแล้ว!';
-      setTimeout(() => { e.target.textContent = original; }, 1200);
+      const original = copyBtn.textContent;
+      copyBtn.textContent = 'คัดลอกแล้ว!';
+      setTimeout(() => { copyBtn.textContent = original; }, 1200);
     }).catch(() => alert(`ID: ${value}`));
+    return;
+  }
+
+  if (deviceEditBtn) {
+    const label = prompt('ชื่ออุปกรณ์ (เช่น Admin, Entry, Exit):');
+    if (label === null) return;
+    const deviceId = prompt('AnyDesk ID:');
+    if (deviceId === null) return;
+    if (!label.trim() || !deviceId.trim()) return;
+    await fetch(`/api/anydesk/devices/${deviceEditBtn.dataset.deviceId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: label.trim(), device_id: deviceId.trim() }),
+    });
+    loadAnydesk();
+    return;
+  }
+
+  if (deviceDeleteBtn) {
+    if (!confirm('ยืนยันลบอุปกรณ์นี้?')) return;
+    await fetch(`/api/anydesk/devices/${deviceDeleteBtn.dataset.deviceId}`, { method: 'DELETE' });
+    loadAnydesk();
+    return;
+  }
+
+  if (addDeviceBtn) {
+    const label = prompt('ชื่ออุปกรณ์ (เช่น Admin, Entry, Exit):');
+    if (!label || !label.trim()) return;
+    const deviceId = prompt('AnyDesk ID:');
+    if (!deviceId || !deviceId.trim()) return;
+    await fetch(`/api/anydesk/${addDeviceBtn.dataset.storeId}/devices`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: label.trim(), device_id: deviceId.trim() }),
+    });
+    loadAnydesk();
+    return;
+  }
+
+  if (editStoreBtn) {
+    const stores = window.__allAnydeskStores || [];
+    const store = stores.find((s) => String(s.id) === editStoreBtn.dataset.storeId);
+    if (store) openAnydeskStoreModal(store);
+    return;
+  }
+
+  if (deleteStoreBtn) {
+    if (!confirm('ยืนยันลบสาขานี้ทั้งหมด (รวมอุปกรณ์ทุกชิ้น)?')) return;
+    await fetch(`/api/anydesk/${deleteStoreBtn.dataset.storeId}`, { method: 'DELETE' });
+    loadAnydesk();
   }
 });
 
+document.getElementById('anydesk-add-btn').addEventListener('click', () => openAnydeskStoreModal(null));
+
+function openAnydeskStoreModal(store) {
+  const isEdit = !!store;
+  currentModalTicketId = null;
+  modalBody.innerHTML = `
+    <h3>${isEdit ? `แก้ไขสาขา: ${escapeHtml(store.name)}` : 'เพิ่มสาขาใหม่'}</h3>
+    <div class="form-row">
+      <input type="text" id="anydesk-modal-name" placeholder="ชื่อสาขา *" value="${isEdit ? escapeHtml(store.name) : ''}" />
+    </div>
+    <div class="form-row">
+      <select id="anydesk-modal-program">
+        ${PROGRAM_OPTIONS.map((p) => `<option value="${p}" ${isEdit && store.program === p ? 'selected' : ''}>${p}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-row">
+      <input type="text" id="anydesk-modal-note" placeholder="หมายเหตุ (ถ้ามี)" value="${isEdit ? escapeHtml(store.note || '') : ''}" />
+    </div>
+    <p class="hint">โปรแกรม = แอปที่ต้องเปิดเพื่อรีโมทเข้าสาขานี้ (AnyDesk ปกติ หรือ PSS GO)</p>
+    <div class="form-row">
+      <button id="anydesk-modal-save-btn">${isEdit ? 'บันทึก' : 'สร้างสาขา'}</button>
+    </div>
+  `;
+  modalOverlay.style.display = 'flex';
+
+  document.getElementById('anydesk-modal-save-btn').onclick = async () => {
+    const name = document.getElementById('anydesk-modal-name').value.trim();
+    if (!name) {
+      alert('กรุณากรอกชื่อสาขา');
+      return;
+    }
+    const payload = {
+      name,
+      program: document.getElementById('anydesk-modal-program').value,
+      note: document.getElementById('anydesk-modal-note').value.trim(),
+    };
+    const url = isEdit ? `/api/anydesk/${store.id}` : '/api/anydesk';
+    const method = isEdit ? 'PUT' : 'POST';
+    const r = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      alert(err.error || 'เกิดข้อผิดพลาด');
+      return;
+    }
+    closeModal();
+    loadAnydesk();
+  };
+}
+
 // ---- Dashboard (Kanban) ----
-const STATUS_ORDER = ['open', 'in-progress', 'done'];
+const STATUS_ORDER = ['open', 'in-progress', 'on-hold', 'done'];
+// What the quick action button on a card does next: open→in-progress→done,
+// while on-hold is a side-state you pause into and resume out of.
+const ADVANCE_MAP = { open: 'in-progress', 'in-progress': 'done', 'on-hold': 'in-progress' };
 let dashboardFilter = 'all';
 
 async function loadDashboard() {
@@ -307,12 +437,13 @@ async function loadDashboard() {
 }
 
 function renderDashboardStats(tickets) {
-  const counts = { open: 0, 'in-progress': 0, done: 0 };
+  const counts = { open: 0, 'in-progress': 0, 'on-hold': 0, done: 0 };
   tickets.forEach((t) => { counts[t.status] = (counts[t.status] || 0) + 1; });
   const stats = [
     { key: 'all', label: 'ทั้งหมด', count: tickets.length },
     { key: 'open', label: 'Open', count: counts.open || 0 },
     { key: 'in-progress', label: 'In Progress', count: counts['in-progress'] || 0 },
+    { key: 'on-hold', label: 'On Hold', count: counts['on-hold'] || 0 },
     { key: 'done', label: 'Done', count: counts.done || 0 },
   ];
   const el = document.getElementById('dashboard-stats');
@@ -352,7 +483,9 @@ function renderBoard(tickets) {
 }
 
 function renderBoardCard(t) {
-  const nextStatus = STATUS_ORDER[STATUS_ORDER.indexOf(t.status) + 1];
+  const nextStatus = ADVANCE_MAP[t.status];
+  const advanceLabel = t.status === 'on-hold' ? '▶ กลับมาทำ' : (nextStatus ? `→ ${statusLabel[nextStatus]}` : '');
+  const showHold = t.status === 'open' || t.status === 'in-progress';
   return `
     <div class="board-card" data-id="${t.id}">
       <p class="card-title">${escapeHtml(t.title)}</p>
@@ -361,7 +494,8 @@ function renderBoardCard(t) {
         <span>${formatDateTime(t.updated_at).slice(5)}</span>
       </p>
       <div class="board-card-actions">
-        ${nextStatus ? `<button class="advance-btn" data-id="${t.id}" data-next="${nextStatus}">→ ${statusLabel[nextStatus]}</button>` : ''}
+        ${nextStatus ? `<button class="advance-btn" data-id="${t.id}" data-next="${nextStatus}">${advanceLabel}</button>` : ''}
+        ${showHold ? `<button class="hold-btn" data-id="${t.id}" title="พักงาน รอช่าง">‖ พัก</button>` : ''}
         <button class="delete-card-btn" data-id="${t.id}">ลบ</button>
       </div>
     </div>
@@ -370,6 +504,7 @@ function renderBoardCard(t) {
 
 document.getElementById('board').addEventListener('click', async (e) => {
   const advanceBtn = e.target.closest('.advance-btn');
+  const holdBtn = e.target.closest('.hold-btn');
   const deleteBtn = e.target.closest('.delete-card-btn');
   const card = e.target.closest('.board-card');
 
@@ -379,6 +514,17 @@ document.getElementById('board').addEventListener('click', async (e) => {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: advanceBtn.dataset.next }),
+    });
+    refreshAll();
+    return;
+  }
+
+  if (holdBtn) {
+    e.stopPropagation();
+    await fetch(`/api/tickets/${holdBtn.dataset.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'on-hold' }),
     });
     refreshAll();
     return;
@@ -502,20 +648,24 @@ async function openTicketModal(id) {
     </div>
 
     <div class="card">
-      <h4 style="margin-top:0">บันทึกงานที่ทำ</h4>
-      <div class="form-row">
-        <input type="text" id="modal-note-input" placeholder="พิมพ์สิ่งที่ทำ แล้วกด Enter หรือกดปุ่ม" />
-        <button type="button" id="modal-add-note-btn">เพิ่มบันทึก</button>
+      <h4 style="margin-top:0">💬 แชท / บันทึกงานเพิ่มเติม</h4>
+      <div class="chat-thread" id="modal-chat-thread">
+        ${(t.notes || []).slice().reverse().map((n) => `
+          <div class="chat-bubble">
+            <div class="chat-bubble-text">${escapeHtml(n.note)}</div>
+            <div class="chat-bubble-meta">${formatDateTime(n.created_at)}</div>
+          </div>
+        `).join('') || '<div class="empty">ยังไม่มีข้อความ พิมพ์เพื่อบันทึกงานเพิ่มเติม</div>'}
       </div>
-      ${(t.notes || []).map((n) => `
-        <div class="note-item">
-          <div>${escapeHtml(n.note)}</div>
-          <div class="ticket-meta">${formatDateTime(n.created_at)}</div>
-        </div>
-      `).join('') || '<div class="empty">ยังไม่มีบันทึก</div>'}
+      <div class="form-row chat-input-row">
+        <input type="text" id="modal-note-input" placeholder="พิมพ์ข้อความ แล้วกด Enter หรือกดปุ่มส่ง..." />
+        <button type="button" id="modal-add-note-btn">ส่ง</button>
+      </div>
     </div>
   `;
   modalOverlay.style.display = 'flex';
+  const chatThreadEl = document.getElementById('modal-chat-thread');
+  if (chatThreadEl) chatThreadEl.scrollTop = chatThreadEl.scrollHeight;
   currentModalTicketId = t.id;
 
   document.getElementById('modal-save-btn').onclick = async () => {

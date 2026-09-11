@@ -19,9 +19,11 @@ router.get('/', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const { name, note = '', devices = [] } = req.body;
+  const { name, note = '', program = 'AnyDesk', devices = [] } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: 'name is required' });
-  const result = db.prepare('INSERT INTO anydesk_stores (name, note) VALUES (?, ?)').run(name.trim(), note || null);
+  const result = db
+    .prepare('INSERT INTO anydesk_stores (name, note, program) VALUES (?, ?, ?)')
+    .run(name.trim(), note || null, program || 'AnyDesk');
   const insertDevice = db.prepare('INSERT INTO anydesk_devices (store_id, label, device_id) VALUES (?, ?, ?)');
   devices.forEach((d) => {
     if (d.label && d.id) insertDevice.run(result.lastInsertRowid, d.label, d.id);
@@ -36,9 +38,13 @@ router.put('/:id', (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Store not found' });
   const name = req.body.name ?? existing.name;
   const note = req.body.note ?? existing.note;
-  db.prepare('UPDATE anydesk_stores SET name = ?, note = ? WHERE id = ?').run(name, note, req.params.id);
+  const program = req.body.program ?? existing.program;
+  db.prepare('UPDATE anydesk_stores SET name = ?, note = ?, program = ? WHERE id = ?').run(
+    name, note, program, req.params.id
+  );
   const store = db.prepare('SELECT * FROM anydesk_stores WHERE id = ?').get(req.params.id);
-  res.json(store);
+  const storeDevices = db.prepare('SELECT id, label, device_id FROM anydesk_devices WHERE store_id = ?').all(store.id);
+  res.json({ ...store, devices: storeDevices });
 });
 
 router.delete('/:id', (req, res) => {
@@ -57,6 +63,18 @@ router.post('/:id/devices', (req, res) => {
     .run(req.params.id, label.trim(), String(device_id).trim());
   const device = db.prepare('SELECT id, label, device_id FROM anydesk_devices WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(device);
+});
+
+router.put('/devices/:deviceId', (req, res) => {
+  const existing = db.prepare('SELECT * FROM anydesk_devices WHERE id = ?').get(req.params.deviceId);
+  if (!existing) return res.status(404).json({ error: 'Device not found' });
+  const label = req.body.label ?? existing.label;
+  const device_id = req.body.device_id ?? existing.device_id;
+  db.prepare('UPDATE anydesk_devices SET label = ?, device_id = ? WHERE id = ?').run(
+    label, String(device_id), req.params.deviceId
+  );
+  const device = db.prepare('SELECT id, label, device_id FROM anydesk_devices WHERE id = ?').get(req.params.deviceId);
+  res.json(device);
 });
 
 router.delete('/devices/:deviceId', (req, res) => {

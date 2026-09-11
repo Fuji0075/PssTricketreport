@@ -4,14 +4,14 @@
 
 ## ฟีเจอร์
 
-- **Dashboard แบบ Kanban ที่คลิกได้**: การ์ด ticket แยกตามสถานะ Open / In Progress / Done, คลิกการ์ดเพื่อดู/แก้ไขรายละเอียด, กดปุ่มลูกศรเพื่อเลื่อนสถานะเร็วๆ, กด stat card ด้านบนเพื่อกรองดูเฉพาะสถานะ
-- เพิ่ม / แก้ไข / ลบ ticket ผ่านฟอร์มบนเว็บ
-- บันทึก note สิ่งที่ทำในแต่ละวันของแต่ละ ticket
-- **แนบรูปภาพ** ในแต่ละ ticket (ปุ่ม "+ รูป")
+- **Dashboard แบบ Kanban ที่คลิกได้**: การ์ด ticket แยกตามสถานะ Open / In Progress / **On Hold** / Done, คลิกการ์ดเพื่อดู/แก้ไขรายละเอียด, กดปุ่มลูกศรเพื่อเลื่อนสถานะเร็วๆ, กดปุ่ม "‖ พัก" เพื่อพักงาน (กรณีรอช่าง) และ "▶ กลับมาทำ" เพื่อกลับมาทำต่อ, กด stat card ด้านบนเพื่อกรองดูเฉพาะสถานะ
+- เพิ่ม / แก้ไข / ลบ ticket ผ่านฟอร์มบนเว็บ, ปุ่ม "+ เพิ่ม Ticket" อยู่บน Dashboard ด้วย
+- **แชทในตัว ticket**: ช่องแชทสำหรับบันทึกความคืบหน้า/งานเพิ่มเติมของแต่ละ ticket แบบข้อความ (แสดงเป็นบับเบิลแชทเรียงตามเวลา)
+- **แนบรูปภาพ** ในแต่ละ ticket (ปุ่ม "+ รูป" หรือวางรูปสกรีนช็อตด้วย Ctrl+V ในหน้าต่างรายละเอียด ticket ได้เลย)
 - นำเข้า ticket จากไฟล์ CSV (ดูตัวอย่างที่ `data/sample-tickets.csv`)
 - หน้าสรุปรายวัน: ticket ที่สร้างใหม่, ticket ที่ปิดแล้ว, บันทึกงานที่ทำ, และภาพรวมสถานะทั้งหมด
 - **แจ้งเตือนงานค้าง**: แบนเนอร์แจ้งเตือนอัตโนมัติเมื่อมี ticket ที่ยังไม่ปิดและไม่มีความเคลื่อนไหวเกิน 2 วัน
-- **หน้า AnyDesk Directory**: ค้นหา ID AnyDesk (Admin/Entry/Exit) ของแต่ละสาขาได้ในที่เดียว ไม่ต้องเปิดไฟล์ Excel แยก (seed ข้อมูลเริ่มต้นจาก `data/anydesk-directory.json`)
+- **หน้า AnyDesk Directory**: ค้นหา ID AnyDesk (Admin/Entry/Exit) ของแต่ละสาขาได้ในที่เดียว ไม่ต้องเปิดไฟล์ Excel แยก (seed ข้อมูลเริ่มต้นจาก `data/anydesk-directory.json`) พร้อม**เพิ่ม/แก้ไข/ลบสาขาและอุปกรณ์ได้ในหน้าเว็บ** และแท็กสี **"โปรแกรม"** (AnyDesk / PSS GO) บอกว่าสาขานั้นต้องเปิดโปรแกรมอะไรเพื่อรีโมทเข้า
 
 ## เริ่มต้นใช้งาน
 
@@ -36,7 +36,7 @@ title,description,assignee,status,priority
 แก้บั๊ก X,รายละเอียด,ชื่อผู้รับผิดชอบ,open,medium
 ```
 
-- `status`: `open`, `in-progress`, `done`
+- `status`: `open`, `in-progress`, `on-hold`, `done`
 - `priority`: `low`, `medium`, `high`, `urgent`
 
 ## API หลัก
@@ -54,9 +54,10 @@ title,description,assignee,status,priority
 | POST | `/api/tickets/import` | นำเข้า ticket จากไฟล์ CSV (multipart field: `file`) |
 | GET | `/api/summary/daily?date=YYYY-MM-DD` | สรุปงานประจำวัน |
 | GET | `/api/summary/pending?staleDays=2` | รายการ ticket ที่ค้าง (ยังไม่ปิด และไม่มีความเคลื่อนไหวเกิน `staleDays` วัน) |
-| GET | `/api/anydesk?q=` | รายการสาขา + ID AnyDesk (ค้นหาด้วย `q`) |
-| POST | `/api/anydesk` | เพิ่มสาขาใหม่ |
-| PUT | `/api/anydesk/:id` | แก้ไขชื่อ/หมายเหตุสาขา |
+| GET | `/api/anydesk?q=` | รายการสาขา + ID AnyDesk + โปรแกรม (ค้นหาด้วย `q`) |
+| POST | `/api/anydesk` | เพิ่มสาขาใหม่ (`name`, `program`, `note`) |
+| PUT | `/api/anydesk/:id` | แก้ไขชื่อ/หมายเหตุ/โปรแกรมของสาขา |
 | DELETE | `/api/anydesk/:id` | ลบสาขา |
 | POST | `/api/anydesk/:id/devices` | เพิ่มอุปกรณ์ AnyDesk ให้สาขา |
+| PUT | `/api/anydesk/devices/:deviceId` | แก้ไขชื่อ/ID อุปกรณ์ |
 | DELETE | `/api/anydesk/devices/:deviceId` | ลบอุปกรณ์ AnyDesk |

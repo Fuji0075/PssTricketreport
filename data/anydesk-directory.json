@@ -2,6 +2,7 @@
   {
     "name": "โรบินสันแม่สอด",
     "note": null,
+    "program": "PSS GO",
     "devices": [
       { "kind": "Admin", "id": "1533862746", "label": "Admin" },
       { "kind": "Entry", "id": "512094108", "label": "Entry" },
@@ -11,6 +12,7 @@
   {
     "name": "โรบินสัน สุพรรณบุรี",
     "note": null,
+    "program": "AnyDesk",
     "devices": [
       { "kind": "Admin", "id": "759499473", "label": "Admin" },
       { "kind": "Entry", "id": "1771947779", "label": "Entry" },
@@ -22,6 +24,7 @@
   {
     "name": "โรบินสัน ร้อยเอ็ด",
     "note": null,
+    "program": "PSS GO",
     "devices": [
       { "kind": "Admin", "id": "253708251", "label": "Admin" },
       { "kind": "Entry", "id": "1414328660", "label": "Entry" },
@@ -33,6 +36,7 @@
   {
     "name": "โรบินสัน ปราจีนบุรี",
     "note": null,
+    "program": "PSS GO",
     "devices": [
       { "kind": "Admin", "id": "1648682327", "label": "Admin" },
       { "kind": "Entry", "id": "247839936", "label": "Entry" },
@@ -42,6 +46,7 @@
   {
     "name": "โรบินสัน กาญจนบุรี",
     "note": null,
+    "program": "AnyDesk",
     "devices": [
       { "kind": "Admin", "id": "1249073737", "label": "Admin" },
       { "kind": "Entry", "id": "1739001002", "label": "Entry" },
@@ -53,6 +58,7 @@
   {
     "name": "โรบินสัน สระบุรี",
     "note": null,
+    "program": "PSS GO",
     "devices": [
       { "kind": "Admin", "id": "1027644799", "label": "Admin" },
       { "kind": "Entry", "id": "1554822862", "label": "Entry" },
@@ -64,6 +70,7 @@
   {
     "name": "โรบินสัน สมุทรปราการ",
     "note": null,
+    "program": "PSS GO",
     "devices": [
       { "kind": "Admin", "id": "1391639057", "label": "Admin" },
       { "kind": "Entry", "id": "1920835362", "label": "Entry" },
@@ -75,6 +82,7 @@
   {
     "name": "โรบินสันบ้านฉาง",
     "note": null,
+    "program": "PSS GO",
     "devices": [
       { "kind": "Admin", "id": "1269831560", "label": "Admin" },
       { "kind": "Entry", "id": "980376480", "label": "Entry" },
@@ -84,6 +92,7 @@
   {
     "name": "โรบินสัน สกลนคร",
     "note": null,
+    "program": "AnyDesk",
     "devices": [
       { "kind": "Admin", "id": "1680673972", "label": "Admin" },
       { "kind": "Entry", "id": "1876162433", "label": "Entry" },
@@ -93,6 +102,7 @@
   {
     "name": "โรบินสัน ลาดกระบัง สุวรรณภูมิ",
     "note": null,
+    "program": "PSS GO",
     "devices": [
       { "kind": "Admin", "id": "597806690", "label": "Admin" },
       { "kind": "Entry", "id": "151916777", "label": "Entry" },
@@ -104,6 +114,7 @@
   {
     "name": "โรบินสันชลบุรี",
     "note": null,
+    "program": "PSS GO",
     "devices": [
       { "kind": "Admin", "id": "1640471420", "label": "Admin" },
       { "kind": "Entry", "id": "1930974567", "label": "Entry" },
@@ -115,6 +126,7 @@
   {
     "name": "โรบินสัน มุกดาหาร",
     "note": null,
+    "program": "PSS GO",
     "devices": [
       { "kind": "Admin", "id": "1893263002", "label": "Admin" },
       { "kind": "Entry", "id": "1133348425", "label": "Entry" },
@@ -124,6 +136,7 @@
   {
     "name": "โรบินสันราชพฤกษ์",
     "note": null,
+    "program": "PSS GO",
     "devices": [
       { "kind": "Admin", "id": "1216723247", "label": "Admin" },
       { "kind": "Entry", "id": "1530097692", "label": "Entry" },
@@ -133,6 +146,7 @@
   {
     "name": "โรบินสัน เพชรบุรี",
     "note": "* เอา 80x150 ไปใช้ N1, 2 ม้วน",
+    "program": "AnyDesk",
     "devices": [
       { "kind": "Admin", "id": "1301728694", "label": "Admin" },
       { "kind": "Entry", "id": "1639168487", "label": "Entry" },
@@ -142,6 +156,7 @@
   {
     "name": "โรบินสัน บ่อวิน",
     "note": null,
+    "program": "PSS GO",
     "devices": [
       { "kind": "Admin", "id": "1048200520", "label": "Admin" },
       { "kind": "Entry", "id": "1650890611", "label": "Entry" },
@@ -151,6 +166,7 @@
   {
     "name": "Anydesk โรบินสันศรีสมาน",
     "note": null,
+    "program": "PSS GO",
     "devices": [
       { "kind": "Admin", "id": "1986842481", "label": "Admin" },
       { "kind": "Entry", "id": "1494890533", "label": "Entry" },
@@ -160,6 +176,7 @@
   {
     "name": "โรบินสัน ลพบุรี",
     "note": "* เอา 80x150 ของ N1 ไป 5 ม้วน",
+    "program": "AnyDesk",
     "devices": [
       { "kind": "Admin", "id": "1679636780", "label": "Admin" },
       { "kind": "Entry", "id": "1755892644", "label": "Entry" },
@@ -169,6 +186,7 @@
   {
     "name": "โรบินสัน ฉะเชิงเทรา",
     "note": null,
+    "program": "PSS GO",
     "devices": [
       { "kind": "Admin", "id": "1831712757", "label": "Admin" },
       { "kind": "Entry", "id": "1887372175", "label": "Entry" },
@@ -180,6 +198,7 @@
   {
     "name": "โรบินสัน กำแพงเพชร",
     "note": null,
+    "program": "PSS GO",
     "devices": [
       { "kind": "Admin", "id": "1527911419", "label": "Admin" },
       { "kind": "Entry", "id": "1818803896", "label": "Entry" },
@@ -189,6 +208,7 @@
   {
     "name": "โรบินสัน ชัยภูมิ",
     "note": "* ไม่มีกระดาษ ยังไม่เจอที่หน้างาน, UPS อยู่ LP",
+    "program": "AnyDesk",
     "devices": [
       { "kind": "Admin", "id": "1396642999", "label": "Admin" },
       { "kind": "Entry", "id": "1065943073", "label": "Entry" },
@@ -198,6 +218,7 @@
   {
     "name": "โรบินสัน สุรินทร์",
     "note": null,
+    "program": "AnyDesk",
     "devices": [
       { "kind": "Admin", "id": "1025799402", "label": "Admin" },
       { "kind": "Entry", "id": "1136415080", "label": "Entry" },
@@ -207,6 +228,7 @@
   {
     "name": "โรบินสัน บุรีรัมย์",
     "note": null,
+    "program": "PSS GO",
     "devices": [
       { "kind": "Entry", "id": "1103404905", "label": "Entry" },
       { "kind": "Exit", "id": "814555533", "label": "Exit" }
@@ -215,6 +237,7 @@
   {
     "name": "โรบินสัน ราชบุรี",
     "note": null,
+    "program": "PSS GO",
     "devices": [
       { "kind": "Admin", "id": "1533545265", "label": "Admin" },
       { "kind": "Entry", "id": "1869791879", "label": "Entry" },
@@ -224,6 +247,7 @@
   {
     "name": "โรบินสัน ถลาง",
     "note": null,
+    "program": "PSS GO",
     "devices": [
       { "kind": "Admin", "id": "1873916914", "label": "Admin" },
       { "kind": "Entry", "id": "1652468654", "label": "Entry" },
@@ -233,6 +257,7 @@
   {
     "name": "โรบินสัน ฉลอง",
     "note": null,
+    "program": "PSS GO",
     "devices": [
       { "kind": "Admin", "id": "1629899240", "label": "Admin" },
       { "kind": "Entry", "id": "1117487904", "label": "Entry" },
@@ -242,6 +267,7 @@
   {
     "name": "โรบินสัน ตรัง",
     "note": null,
+    "program": "AnyDesk",
     "devices": [
       { "kind": "Admin", "id": "1737341517", "label": "Admin" },
       { "kind": "Entry", "id": "1280077436", "label": "Entry" },
