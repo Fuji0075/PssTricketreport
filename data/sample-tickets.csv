@@ -1,0 +1,4 @@
+title,description,assignee,status,priority
+แก้ปัญหา login ไม่ได้,ผู้ใช้ไม่สามารถ login ผ่านหน้าเว็บได้,สมชาย,in-progress,high
+เพิ่มฟีเจอร์ export PDF,ต้องการปุ่ม export รายงานเป็น PDF,สมหญิง,open,medium
+แก้ bug หน้า dashboard แสดงผลผิด,กราฟแสดงตัวเลขไม่ตรงกับฐานข้อมูล,สมชาย,done,urgent

@@ -1,0 +1,162 @@
+const express = require('express');
+const multer = require('multer');
+const db = require('../db');
+
+const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage() });
+
+const VALID_STATUS = ['open', 'in-progress', 'done'];
+const VALID_PRIORITY = ['low', 'medium', 'high', 'urgent'];
+
+function serializeTicket(row) {
+  return row;
+}
+
+router.get('/', (req, res) => {
+  const { status, assignee } = req.query;
+  let sql = 'SELECT * FROM tickets';
+  const clauses = [];
+  const params = [];
+  if (status) {
+    clauses.push('status = ?');
+    params.push(status);
+  }
+  if (assignee) {
+    clauses.push('assignee = ?');
+    params.push(assignee);
+  }
+  if (clauses.length) sql += ' WHERE ' + clauses.join(' AND ');
+  sql += ' ORDER BY updated_at DESC';
+  const rows = db.prepare(sql).all(...params);
+  res.json(rows.map(serializeTicket));
+});
+
+router.get('/:id', (req, res) => {
+  const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.id);
+  if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+  const notes = db
+    .prepare('SELECT * FROM ticket_notes WHERE ticket_id = ? ORDER BY created_at DESC')
+    .all(req.params.id);
+  res.json({ ...ticket, notes });
+});
+
+router.post('/', (req, res) => {
+  const { title, description = '', assignee = '', status = 'open', priority = 'medium' } = req.body;
+  if (!title || !title.trim()) {
+    return res.status(400).json({ error: 'title is required' });
+  }
+  if (!VALID_STATUS.includes(status)) {
+    return res.status(400).json({ error: `status must be one of ${VALID_STATUS.join(', ')}` });
+  }
+  if (!VALID_PRIORITY.includes(priority)) {
+    return res.status(400).json({ error: `priority must be one of ${VALID_PRIORITY.join(', ')}` });
+  }
+  const resolvedAt = status === 'done' ? new Date().toISOString() : null;
+  const result = db
+    .prepare(
+      `INSERT INTO tickets (title, description, assignee, status, priority, resolved_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    )
+    .run(title.trim(), description, assignee, status, priority, resolvedAt);
+  const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(result.lastInsertRowid);
+  res.status(201).json(ticket);
+});
+
+router.put('/:id', (req, res) => {
+  const existing = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Ticket not found' });
+
+  const title = req.body.title ?? existing.title;
+  const description = req.body.description ?? existing.description;
+  const assignee = req.body.assignee ?? existing.assignee;
+  const status = req.body.status ?? existing.status;
+  const priority = req.body.priority ?? existing.priority;
+
+  if (!VALID_STATUS.includes(status)) {
+    return res.status(400).json({ error: `status must be one of ${VALID_STATUS.join(', ')}` });
+  }
+  if (!VALID_PRIORITY.includes(priority)) {
+    return res.status(400).json({ error: `priority must be one of ${VALID_PRIORITY.join(', ')}` });
+  }
+
+  let resolvedAt = existing.resolved_at;
+  if (status === 'done' && existing.status !== 'done') {
+    resolvedAt = new Date().toISOString();
+  } else if (status !== 'done') {
+    resolvedAt = null;
+  }
+
+  db.prepare(
+    `UPDATE tickets SET title = ?, description = ?, assignee = ?, status = ?, priority = ?,
+     resolved_at = ?, updated_at = datetime('now') WHERE id = ?`
+  ).run(title, description, assignee, status, priority, resolvedAt, req.params.id);
+
+  const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.id);
+  res.json(ticket);
+});
+
+router.delete('/:id', (req, res) => {
+  const result = db.prepare('DELETE FROM tickets WHERE id = ?').run(req.params.id);
+  if (result.changes === 0) return res.status(404).json({ error: 'Ticket not found' });
+  res.status(204).end();
+});
+
+router.post('/:id/notes', (req, res) => {
+  const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.id);
+  if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+  const { note } = req.body;
+  if (!note || !note.trim()) return res.status(400).json({ error: 'note is required' });
+  const result = db
+    .prepare('INSERT INTO ticket_notes (ticket_id, note) VALUES (?, ?)')
+    .run(req.params.id, note.trim());
+  db.prepare(`UPDATE tickets SET updated_at = datetime('now') WHERE id = ?`).run(req.params.id);
+  const created = db.prepare('SELECT * FROM ticket_notes WHERE id = ?').get(result.lastInsertRowid);
+  res.status(201).json(created);
+});
+
+function parseCsv(text) {
+  const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  if (lines.length === 0) return [];
+  const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
+  return lines.slice(1).map((line) => {
+    const cells = line.split(',').map((c) => c.trim());
+    const row = {};
+    headers.forEach((h, i) => {
+      row[h] = cells[i] ?? '';
+    });
+    return row;
+  });
+}
+
+router.post('/import', upload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'file is required (field name: file)' });
+  const text = req.file.buffer.toString('utf-8');
+  const rows = parseCsv(text);
+
+  const insert = db.prepare(
+    `INSERT INTO tickets (title, description, assignee, status, priority, resolved_at)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  );
+
+  let imported = 0;
+  const errors = [];
+  const insertMany = db.transaction((items) => {
+    items.forEach((row, idx) => {
+      const title = row.title;
+      if (!title) {
+        errors.push({ line: idx + 2, error: 'missing title' });
+        return;
+      }
+      const status = VALID_STATUS.includes(row.status) ? row.status : 'open';
+      const priority = VALID_PRIORITY.includes(row.priority) ? row.priority : 'medium';
+      const resolvedAt = status === 'done' ? new Date().toISOString() : null;
+      insert.run(title, row.description || '', row.assignee || '', status, priority, resolvedAt);
+      imported += 1;
+    });
+  });
+  insertMany(rows);
+
+  res.json({ imported, errors });
+});
+
+module.exports = router;

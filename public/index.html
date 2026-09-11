@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ticket Report</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Ticket Report</h1>
+    <p class="subtitle">บันทึก ticket และดูสรุปงานประจำวัน</p>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="tickets">Tickets</button>
+      <button class="tab-btn" data-tab="summary">สรุปรายวัน</button>
+      <button class="tab-btn" data-tab="import">นำเข้าไฟล์</button>
+    </div>
+
+    <div id="tab-tickets" class="tab-panel active">
+      <div class="card">
+        <h3 id="form-title">เพิ่ม Ticket ใหม่</h3>
+        <form id="ticket-form">
+          <input type="hidden" id="ticket-id" />
+          <div class="form-row">
+            <input type="text" id="title" placeholder="หัวข้อ ticket *" required />
+            <input type="text" id="assignee" placeholder="ผู้รับผิดชอบ" />
+          </div>
+          <div class="form-row">
+            <select id="status">
+              <option value="open">Open</option>
+              <option value="in-progress">In Progress</option>
+              <option value="done">Done</option>
+            </select>
+            <select id="priority">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <textarea id="description" placeholder="รายละเอียด"></textarea>
+          </div>
+          <div class="form-row">
+            <button type="submit" id="submit-btn">บันทึก Ticket</button>
+            <button type="button" id="cancel-edit" class="secondary" style="display:none">ยกเลิกแก้ไข</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="filters">
+        <select id="filter-status">
+          <option value="">ทุกสถานะ</option>
+          <option value="open">Open</option>
+          <option value="in-progress">In Progress</option>
+          <option value="done">Done</option>
+        </select>
+        <button class="secondary" id="refresh-tickets">รีเฟรช</button>
+      </div>
+
+      <div id="ticket-list" class="ticket-list"></div>
+    </div>
+
+    <div id="tab-summary" class="tab-panel">
+      <div class="card summary-header">
+        <label for="summary-date">วันที่:</label>
+        <input type="date" id="summary-date" />
+        <button id="load-summary">ดูสรุป</button>
+      </div>
+      <div id="summary-result"></div>
+    </div>
+
+    <div id="tab-import" class="tab-panel">
+      <div class="card">
+        <h3>นำเข้า Ticket จากไฟล์ CSV</h3>
+        <p class="hint">
+          รูปแบบไฟล์ CSV: คอลัมน์ <code>title,description,assignee,status,priority</code>
+          (บรรทัดแรกเป็นหัวคอลัมน์ ค่า status: open/in-progress/done, priority: low/medium/high/urgent)
+        </p>
+        <input type="file" id="import-file" accept=".csv,text/csv" />
+        <button id="import-btn">นำเข้า</button>
+        <div id="import-result"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
