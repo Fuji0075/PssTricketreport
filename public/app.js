@@ -557,10 +557,13 @@ async function loadPendingBanner() {
   const res = await fetch('/api/summary/pending?staleDays=2');
   const data = await res.json();
   const banner = document.getElementById('pending-banner');
+  const dot = document.getElementById('sidebar-pending-dot');
   if (data.count === 0) {
     banner.style.display = 'none';
+    dot.style.display = 'none';
     return;
   }
+  dot.style.display = 'inline-block';
   banner.style.display = 'block';
   banner.innerHTML = `
     <strong>⚠ มี ${data.count} ticket ที่ค้างอยู่เกิน ${data.staleDays} วัน</strong>
