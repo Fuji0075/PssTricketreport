@@ -401,6 +401,63 @@ document.getElementById('board').addEventListener('click', async (e) => {
 const modalOverlay = document.getElementById('ticket-modal-overlay');
 const modalBody = document.getElementById('modal-body');
 
+function openCreateTicketModal() {
+  currentModalTicketId = null;
+  modalBody.innerHTML = `
+    <h3>เพิ่ม Ticket ใหม่</h3>
+    <div class="form-row">
+      <input type="text" id="modal-new-title" placeholder="หัวข้อ ticket *" />
+      <input type="text" id="modal-new-assignee" placeholder="ผู้รับผิดชอบ" />
+    </div>
+    <div class="form-row">
+      <select id="modal-new-status">
+        ${STATUS_ORDER.map((s) => `<option value="${s}">${statusLabel[s]}</option>`).join('')}
+      </select>
+      <select id="modal-new-priority">
+        ${['low', 'medium', 'high', 'urgent'].map((p) => `<option value="${p}" ${p === 'medium' ? 'selected' : ''}>${p}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-row">
+      <textarea id="modal-new-description" placeholder="รายละเอียด"></textarea>
+    </div>
+    <p class="hint">สร้าง ticket ก่อน แล้วค่อยแนบรูป (วาง Ctrl+V ได้) ในขั้นถัดไป</p>
+    <div class="form-row">
+      <button id="modal-create-btn">สร้าง Ticket</button>
+    </div>
+  `;
+  modalOverlay.style.display = 'flex';
+
+  document.getElementById('modal-create-btn').onclick = async () => {
+    const title = document.getElementById('modal-new-title').value.trim();
+    if (!title) {
+      alert('กรุณากรอกหัวข้อ ticket');
+      return;
+    }
+    const payload = {
+      title,
+      assignee: document.getElementById('modal-new-assignee').value,
+      status: document.getElementById('modal-new-status').value,
+      priority: document.getElementById('modal-new-priority').value,
+      description: document.getElementById('modal-new-description').value,
+    };
+    const r = await fetch('/api/tickets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      alert(err.error || 'เกิดข้อผิดพลาด');
+      return;
+    }
+    const created = await r.json();
+    refreshAll();
+    openTicketModal(created.id);
+  };
+}
+
+document.getElementById('dashboard-add-btn').addEventListener('click', openCreateTicketModal);
+
 async function openTicketModal(id) {
   const res = await fetch(`/api/tickets/${id}`);
   if (!res.ok) return;
@@ -429,7 +486,7 @@ async function openTicketModal(id) {
 
     <div class="card">
       <h4 style="margin-top:0">รูปภาพ</h4>
-      <div class="attachment-thumbs">
+      <div class="attachment-thumbs" id="modal-attachments">
         ${(t.attachments || []).map((a) => `
           <span style="position:relative;display:inline-block;">
             <a href="uploads/${a.filename}" target="_blank"><img src="uploads/${a.filename}" class="thumb" alt="${escapeHtml(a.original_name)}" /></a>
@@ -437,7 +494,11 @@ async function openTicketModal(id) {
           </span>
         `).join('') || '<span class="hint">ยังไม่มีรูป</span>'}
       </div>
-      <button type="button" class="secondary" id="modal-photo-btn" style="margin-top:8px">+ เพิ่มรูป</button>
+      <div class="form-row" style="align-items:center; margin-top:8px;">
+        <button type="button" class="secondary" id="modal-photo-btn">+ เพิ่มรูป</button>
+        <span class="hint">หรือวางรูปที่ก็อปมา (Ctrl+V / คลิกขวา &gt; วาง) ได้เลย</span>
+      </div>
+      <div id="modal-paste-status" class="hint"></div>
     </div>
 
     <div class="card">
@@ -455,6 +516,7 @@ async function openTicketModal(id) {
     </div>
   `;
   modalOverlay.style.display = 'flex';
+  currentModalTicketId = t.id;
 
   document.getElementById('modal-save-btn').onclick = async () => {
     const payload = {
@@ -491,16 +553,7 @@ async function openTicketModal(id) {
     input.accept = 'image/*';
     input.onchange = async () => {
       if (!input.files.length) return;
-      const formData = new FormData();
-      formData.append('image', input.files[0]);
-      const r = await fetch(`/api/tickets/${t.id}/attachments`, { method: 'POST', body: formData });
-      if (!r.ok) {
-        const err = await r.json().catch(() => ({}));
-        alert(err.error || 'อัปโหลดรูปไม่สำเร็จ');
-        return;
-      }
-      openTicketModal(t.id);
-      refreshAll();
+      await uploadAttachment(t.id, input.files[0]);
     };
     input.click();
   };
@@ -539,11 +592,44 @@ async function openTicketModal(id) {
 function closeModal() {
   modalOverlay.style.display = 'none';
   modalBody.innerHTML = '';
+  currentModalTicketId = null;
 }
 
 document.getElementById('modal-close').addEventListener('click', closeModal);
 modalOverlay.addEventListener('click', (e) => {
   if (e.target === modalOverlay) closeModal();
+});
+
+async function uploadAttachment(ticketId, file) {
+  const statusEl = document.getElementById('modal-paste-status');
+  if (statusEl) statusEl.textContent = 'กำลังอัปโหลดรูป...';
+  const formData = new FormData();
+  formData.append('image', file);
+  const r = await fetch(`/api/tickets/${ticketId}/attachments`, { method: 'POST', body: formData });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    alert(err.error || 'อัปโหลดรูปไม่สำเร็จ');
+    if (statusEl) statusEl.textContent = '';
+    return;
+  }
+  openTicketModal(ticketId);
+  refreshAll();
+}
+
+// Allow pasting a screenshot (Ctrl+V) directly into the ticket modal.
+let currentModalTicketId = null;
+document.addEventListener('paste', (e) => {
+  if (!currentModalTicketId || modalOverlay.style.display !== 'flex') return;
+  const items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type && item.type.startsWith('image/')) {
+      e.preventDefault();
+      const file = item.getAsFile();
+      if (file) uploadAttachment(currentModalTicketId, file);
+      return;
+    }
+  }
 });
 
 function refreshAll() {
