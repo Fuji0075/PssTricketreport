@@ -356,6 +356,7 @@ button.secondary:hover { background: var(--bg); border-color: var(--primary); co
 
 .task-main { padding: 22px 24px; overflow-y: auto; }
 .task-breadcrumb { color: var(--muted); font-size: 0.78rem; font-weight: 600; margin-bottom: 6px; }
+.save-status { color: var(--done); font-weight: 700; margin-left: 6px; }
 
 .task-title-input {
   width: 100%; border: none; background: none; padding: 4px 0 12px; resize: none; overflow: hidden;

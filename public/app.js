@@ -658,7 +658,7 @@ async function openTicketModal(id) {
   modalBody.innerHTML = `
     <div class="task-view">
       <div class="task-main">
-        <div class="task-breadcrumb">Ticket #${t.id}</div>
+        <div class="task-breadcrumb">Ticket #${t.id} <span id="modal-save-status" class="save-status"></span></div>
         <textarea id="modal-title" class="task-title-input" rows="1" placeholder="หัวข้อ">${escapeHtml(t.title)}</textarea>
 
         <div class="field-grid">
@@ -684,7 +684,7 @@ async function openTicketModal(id) {
           </div>
           <div class="field-row">
             <span class="field-label">✏️ อัปเดตล่าสุด</span>
-            <span class="field-static">${formatDateTime(t.updated_at)}</span>
+            <span class="field-static" id="modal-updated-at">${formatDateTime(t.updated_at)}</span>
           </div>
         </div>
 
@@ -711,7 +711,6 @@ async function openTicketModal(id) {
         </div>
 
         <div class="task-main-actions">
-          <button id="modal-save-btn">บันทึก</button>
           <button type="button" class="secondary" id="modal-delete-btn">ลบ Ticket</button>
         </div>
       </div>
@@ -743,40 +742,22 @@ async function openTicketModal(id) {
 
   const statusSelectEl = document.getElementById('modal-status');
   paintStatusSelect(statusSelectEl);
-  statusSelectEl.addEventListener('change', () => paintStatusSelect(statusSelectEl));
 
   const titleTextarea = document.getElementById('modal-title');
   const autoGrow = () => { titleTextarea.style.height = 'auto'; titleTextarea.style.height = `${titleTextarea.scrollHeight}px`; };
   autoGrow();
   titleTextarea.addEventListener('input', autoGrow);
 
-  document.getElementById('modal-save-btn').onclick = async () => {
-    const createdAtValue = document.getElementById('modal-created-at').value;
-    if (!createdAtValue) {
-      alert('กรุณาระบุวันที่สร้าง');
-      return;
-    }
-    const payload = {
-      title: document.getElementById('modal-title').value,
-      assignee: document.getElementById('modal-assignee').value,
-      status: document.getElementById('modal-status').value,
-      priority: document.getElementById('modal-priority').value,
-      description: document.getElementById('modal-description').value,
-      created_at: createdAtValue,
-    };
-    const r = await fetch(`/api/tickets/${t.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (!r.ok) {
-      const err = await r.json().catch(() => ({}));
-      alert(err.error || 'เกิดข้อผิดพลาด');
-      return;
-    }
-    closeModal();
-    refreshAll();
-  };
+  // Auto-save: status/priority/date save immediately on change, text
+  // fields save on blur, so switching cards or clicking away never loses
+  // an edit and never requires an explicit "save" click.
+  const autoSave = () => autoSaveTicket(t.id);
+  statusSelectEl.addEventListener('change', () => { paintStatusSelect(statusSelectEl); autoSave(); });
+  document.getElementById('modal-priority').addEventListener('change', autoSave);
+  document.getElementById('modal-created-at').addEventListener('change', autoSave);
+  titleTextarea.addEventListener('blur', autoSave);
+  document.getElementById('modal-assignee').addEventListener('blur', autoSave);
+  document.getElementById('modal-description').addEventListener('blur', autoSave);
 
   document.getElementById('modal-delete-btn').onclick = async () => {
     if (!confirm('ยืนยันลบ ticket นี้?')) return;
@@ -872,6 +853,47 @@ document.addEventListener('paste', (e) => {
 });
 
 function refreshAll() {
+  loadTickets();
+  loadDashboard();
+  loadPendingBanner();
+}
+
+async function autoSaveTicket(ticketId) {
+  const createdAtField = document.getElementById('modal-created-at');
+  const statusEl = document.getElementById('modal-save-status');
+  if (!createdAtField || !createdAtField.value) return;
+
+  const payload = {
+    title: document.getElementById('modal-title').value,
+    assignee: document.getElementById('modal-assignee').value,
+    status: document.getElementById('modal-status').value,
+    priority: document.getElementById('modal-priority').value,
+    description: document.getElementById('modal-description').value,
+    created_at: createdAtField.value,
+  };
+
+  if (statusEl) statusEl.textContent = 'กำลังบันทึก...';
+  const r = await fetch(`/api/tickets/${ticketId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    if (statusEl) statusEl.textContent = '';
+    alert(err.error || 'บันทึกไม่สำเร็จ');
+    return;
+  }
+  const updated = await r.json();
+  if (statusEl) {
+    statusEl.textContent = '✓ บันทึกแล้ว';
+    setTimeout(() => { if (statusEl && statusEl.textContent === '✓ บันทึกแล้ว') statusEl.textContent = ''; }, 1500);
+  }
+  const updatedAtEl = document.getElementById('modal-updated-at');
+  if (updatedAtEl) updatedAtEl.textContent = formatDateTime(updated.updated_at);
+
+  // Refresh board/list/banner in the background without touching the
+  // currently open modal, so the user's cursor/focus isn't disrupted.
   loadTickets();
   loadDashboard();
   loadPendingBanner();
