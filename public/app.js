@@ -88,7 +88,7 @@ ticketForm.addEventListener('submit', async (e) => {
     return;
   }
   resetForm();
-  loadTickets();
+  refreshAll();
 });
 
 function resetForm() {
@@ -108,7 +108,7 @@ document.getElementById('ticket-list').addEventListener('click', async (e) => {
   if (e.target.classList.contains('delete-btn')) {
     if (!confirm('ยืนยันลบ ticket นี้?')) return;
     await fetch(`/api/tickets/${id}`, { method: 'DELETE' });
-    loadTickets();
+    refreshAll();
     return;
   }
 
@@ -142,7 +142,7 @@ document.getElementById('ticket-list').addEventListener('click', async (e) => {
         alert(err.error || 'อัปโหลดรูปไม่สำเร็จ');
         return;
       }
-      loadTickets();
+      refreshAll();
     };
     input.click();
     return;
@@ -161,7 +161,7 @@ document.getElementById('ticket-list').addEventListener('click', async (e) => {
       alert(err.error || 'เกิดข้อผิดพลาด');
       return;
     }
-    loadTickets();
+    refreshAll();
   }
 });
 
@@ -248,7 +248,7 @@ document.getElementById('import-btn').addEventListener('click', async () => {
     return;
   }
   resultEl.innerHTML = `<p>นำเข้าสำเร็จ ${data.imported} รายการ${data.errors.length ? `, ผิดพลาด ${data.errors.length} รายการ` : ''}</p>`;
-  loadTickets();
+  refreshAll();
 });
 
 // ---- AnyDesk directory ----
@@ -294,6 +294,264 @@ document.getElementById('anydesk-list').addEventListener('click', (e) => {
   }
 });
 
+// ---- Dashboard (Kanban) ----
+const STATUS_ORDER = ['open', 'in-progress', 'done'];
+let dashboardFilter = 'all';
+
+async function loadDashboard() {
+  const res = await fetch('/api/tickets');
+  const tickets = await res.json();
+  window.__allTickets = tickets;
+  renderDashboardStats(tickets);
+  renderBoard(tickets);
+}
+
+function renderDashboardStats(tickets) {
+  const counts = { open: 0, 'in-progress': 0, done: 0 };
+  tickets.forEach((t) => { counts[t.status] = (counts[t.status] || 0) + 1; });
+  const stats = [
+    { key: 'all', label: 'ทั้งหมด', count: tickets.length },
+    { key: 'open', label: 'Open', count: counts.open || 0 },
+    { key: 'in-progress', label: 'In Progress', count: counts['in-progress'] || 0 },
+    { key: 'done', label: 'Done', count: counts.done || 0 },
+  ];
+  const el = document.getElementById('dashboard-stats');
+  el.innerHTML = stats.map((s) => `
+    <div class="dashboard-stat ${dashboardFilter === s.key ? 'active' : ''}" data-key="${s.key}">
+      <span class="num">${s.count}</span>
+      <span class="label">${escapeHtml(s.label)}</span>
+    </div>
+  `).join('');
+}
+
+document.getElementById('dashboard-stats').addEventListener('click', (e) => {
+  const card = e.target.closest('.dashboard-stat');
+  if (!card) return;
+  dashboardFilter = card.dataset.key;
+  renderDashboardStats(window.__allTickets || []);
+  renderBoard(window.__allTickets || []);
+});
+
+function renderBoard(tickets) {
+  const board = document.getElementById('board');
+  const visible = dashboardFilter === 'all' ? tickets : tickets.filter((t) => t.status === dashboardFilter);
+
+  board.innerHTML = STATUS_ORDER.map((status) => {
+    const columnTickets = visible.filter((t) => t.status === status)
+      .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1));
+    return `
+      <div class="board-column" data-status="${status}">
+        <div class="board-column-header">
+          <span>${statusLabel[status]}</span>
+          <span class="board-column-count">${columnTickets.length}</span>
+        </div>
+        ${columnTickets.length ? columnTickets.map((t) => renderBoardCard(t)).join('') : '<div class="board-empty">ไม่มี ticket</div>'}
+      </div>
+    `;
+  }).join('');
+}
+
+function renderBoardCard(t) {
+  const nextStatus = STATUS_ORDER[STATUS_ORDER.indexOf(t.status) + 1];
+  return `
+    <div class="board-card" data-id="${t.id}">
+      <p class="card-title">${escapeHtml(t.title)}</p>
+      <p class="card-meta">
+        <span><span class="priority-dot priority-${t.priority}"></span>#${t.id} ${escapeHtml(t.assignee || '-')}</span>
+        <span>${formatDateTime(t.updated_at).slice(5)}</span>
+      </p>
+      <div class="board-card-actions">
+        ${nextStatus ? `<button class="advance-btn" data-id="${t.id}" data-next="${nextStatus}">→ ${statusLabel[nextStatus]}</button>` : ''}
+        <button class="delete-card-btn" data-id="${t.id}">ลบ</button>
+      </div>
+    </div>
+  `;
+}
+
+document.getElementById('board').addEventListener('click', async (e) => {
+  const advanceBtn = e.target.closest('.advance-btn');
+  const deleteBtn = e.target.closest('.delete-card-btn');
+  const card = e.target.closest('.board-card');
+
+  if (advanceBtn) {
+    e.stopPropagation();
+    await fetch(`/api/tickets/${advanceBtn.dataset.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: advanceBtn.dataset.next }),
+    });
+    refreshAll();
+    return;
+  }
+
+  if (deleteBtn) {
+    e.stopPropagation();
+    if (!confirm('ยืนยันลบ ticket นี้?')) return;
+    await fetch(`/api/tickets/${deleteBtn.dataset.id}`, { method: 'DELETE' });
+    refreshAll();
+    return;
+  }
+
+  if (card) {
+    openTicketModal(card.dataset.id);
+  }
+});
+
+// ---- Ticket detail modal ----
+const modalOverlay = document.getElementById('ticket-modal-overlay');
+const modalBody = document.getElementById('modal-body');
+
+async function openTicketModal(id) {
+  const res = await fetch(`/api/tickets/${id}`);
+  if (!res.ok) return;
+  const t = await res.json();
+  modalBody.innerHTML = `
+    <h3>Ticket #${t.id}</h3>
+    <div class="form-row">
+      <input type="text" id="modal-title" value="${escapeHtml(t.title)}" placeholder="หัวข้อ" />
+      <input type="text" id="modal-assignee" value="${escapeHtml(t.assignee || '')}" placeholder="ผู้รับผิดชอบ" />
+    </div>
+    <div class="form-row">
+      <select id="modal-status">
+        ${STATUS_ORDER.map((s) => `<option value="${s}" ${s === t.status ? 'selected' : ''}>${statusLabel[s]}</option>`).join('')}
+      </select>
+      <select id="modal-priority">
+        ${['low', 'medium', 'high', 'urgent'].map((p) => `<option value="${p}" ${p === t.priority ? 'selected' : ''}>${p}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-row">
+      <textarea id="modal-description" placeholder="รายละเอียด">${escapeHtml(t.description || '')}</textarea>
+    </div>
+    <div class="form-row">
+      <button id="modal-save-btn">บันทึก</button>
+      <button type="button" class="secondary" id="modal-delete-btn">ลบ Ticket</button>
+    </div>
+
+    <div class="card">
+      <h4 style="margin-top:0">รูปภาพ</h4>
+      <div class="attachment-thumbs">
+        ${(t.attachments || []).map((a) => `
+          <span style="position:relative;display:inline-block;">
+            <a href="uploads/${a.filename}" target="_blank"><img src="uploads/${a.filename}" class="thumb" alt="${escapeHtml(a.original_name)}" /></a>
+            <button class="secondary modal-delete-attachment" data-id="${a.id}" style="position:absolute;top:-6px;right:-6px;padding:0 5px;border-radius:50%;">×</button>
+          </span>
+        `).join('') || '<span class="hint">ยังไม่มีรูป</span>'}
+      </div>
+      <button type="button" class="secondary" id="modal-photo-btn" style="margin-top:8px">+ เพิ่มรูป</button>
+    </div>
+
+    <div class="card">
+      <h4 style="margin-top:0">บันทึกงานที่ทำ</h4>
+      <div class="form-row">
+        <input type="text" id="modal-note-input" placeholder="พิมพ์สิ่งที่ทำ แล้วกด Enter หรือกดปุ่ม" />
+        <button type="button" id="modal-add-note-btn">เพิ่มบันทึก</button>
+      </div>
+      ${(t.notes || []).map((n) => `
+        <div class="note-item">
+          <div>${escapeHtml(n.note)}</div>
+          <div class="ticket-meta">${formatDateTime(n.created_at)}</div>
+        </div>
+      `).join('') || '<div class="empty">ยังไม่มีบันทึก</div>'}
+    </div>
+  `;
+  modalOverlay.style.display = 'flex';
+
+  document.getElementById('modal-save-btn').onclick = async () => {
+    const payload = {
+      title: document.getElementById('modal-title').value,
+      assignee: document.getElementById('modal-assignee').value,
+      status: document.getElementById('modal-status').value,
+      priority: document.getElementById('modal-priority').value,
+      description: document.getElementById('modal-description').value,
+    };
+    const r = await fetch(`/api/tickets/${t.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      alert(err.error || 'เกิดข้อผิดพลาด');
+      return;
+    }
+    closeModal();
+    refreshAll();
+  };
+
+  document.getElementById('modal-delete-btn').onclick = async () => {
+    if (!confirm('ยืนยันลบ ticket นี้?')) return;
+    await fetch(`/api/tickets/${t.id}`, { method: 'DELETE' });
+    closeModal();
+    refreshAll();
+  };
+
+  document.getElementById('modal-photo-btn').onclick = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async () => {
+      if (!input.files.length) return;
+      const formData = new FormData();
+      formData.append('image', input.files[0]);
+      const r = await fetch(`/api/tickets/${t.id}/attachments`, { method: 'POST', body: formData });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        alert(err.error || 'อัปโหลดรูปไม่สำเร็จ');
+        return;
+      }
+      openTicketModal(t.id);
+      refreshAll();
+    };
+    input.click();
+  };
+
+  modalBody.querySelectorAll('.modal-delete-attachment').forEach((btn) => {
+    btn.onclick = async () => {
+      await fetch(`/api/tickets/${t.id}/attachments/${btn.dataset.id}`, { method: 'DELETE' });
+      openTicketModal(t.id);
+      refreshAll();
+    };
+  });
+
+  const addNote = async () => {
+    const input = document.getElementById('modal-note-input');
+    const note = input.value.trim();
+    if (!note) return;
+    const r = await fetch(`/api/tickets/${t.id}/notes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ note }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      alert(err.error || 'เกิดข้อผิดพลาด');
+      return;
+    }
+    openTicketModal(t.id);
+    refreshAll();
+  };
+  document.getElementById('modal-add-note-btn').onclick = addNote;
+  document.getElementById('modal-note-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addNote(); }
+  });
+}
+
+function closeModal() {
+  modalOverlay.style.display = 'none';
+  modalBody.innerHTML = '';
+}
+
+document.getElementById('modal-close').addEventListener('click', closeModal);
+modalOverlay.addEventListener('click', (e) => {
+  if (e.target === modalOverlay) closeModal();
+});
+
+function refreshAll() {
+  loadTickets();
+  loadDashboard();
+  loadPendingBanner();
+}
+
 // ---- Pending work banner ----
 async function loadPendingBanner() {
   const res = await fetch('/api/summary/pending?staleDays=2');
@@ -317,6 +575,7 @@ async function loadPendingBanner() {
 
 // ---- Init ----
 loadTickets();
+loadDashboard();
 loadSummary();
 loadAnydesk();
 loadPendingBanner();
