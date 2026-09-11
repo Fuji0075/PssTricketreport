@@ -92,6 +92,16 @@ router.post('/', (req, res) => {
   res.status(201).json(ticket);
 });
 
+function normalizeDateTimeLocal(value) {
+  // Accepts "YYYY-MM-DDTHH:MM" (from <input type="datetime-local">) or
+  // "YYYY-MM-DD HH:MM:SS" and returns SQLite's "YYYY-MM-DD HH:MM:SS" form.
+  const match = String(value).trim().match(
+    /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})(:\d{2})?$/
+  );
+  if (!match) return null;
+  return `${match[1]} ${match[2]}${match[3] || ':00'}`;
+}
+
 router.put('/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Ticket not found' });
@@ -109,6 +119,15 @@ router.put('/:id', (req, res) => {
     return res.status(400).json({ error: `priority must be one of ${VALID_PRIORITY.join(', ')}` });
   }
 
+  let createdAt = existing.created_at;
+  if (req.body.created_at !== undefined) {
+    const normalized = normalizeDateTimeLocal(req.body.created_at);
+    if (!normalized) {
+      return res.status(400).json({ error: 'created_at must be a valid date/time' });
+    }
+    createdAt = normalized;
+  }
+
   let resolvedAt = existing.resolved_at;
   if (status === 'done' && existing.status !== 'done') {
     resolvedAt = new Date().toISOString();
@@ -118,8 +137,8 @@ router.put('/:id', (req, res) => {
 
   db.prepare(
     `UPDATE tickets SET title = ?, description = ?, assignee = ?, status = ?, priority = ?,
-     resolved_at = ?, updated_at = datetime('now') WHERE id = ?`
-  ).run(title, description, assignee, status, priority, resolvedAt, req.params.id);
+     created_at = ?, resolved_at = ?, updated_at = datetime('now') WHERE id = ?`
+  ).run(title, description, assignee, status, priority, createdAt, resolvedAt, req.params.id);
 
   const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.id);
   res.json(ticket);

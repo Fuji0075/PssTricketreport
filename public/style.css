@@ -193,6 +193,25 @@ button.secondary:hover { background: var(--bg); border-color: var(--primary); co
   width: 64px; height: 64px; object-fit: cover; border-radius: 8px;
   border: 1px solid var(--border);
 }
+.lightbox-img { cursor: zoom-in; transition: opacity 0.1s; }
+.lightbox-img:hover { opacity: 0.85; }
+
+.lightbox-overlay {
+  position: fixed; inset: 0; background: rgba(10,10,16,0.88);
+  display: flex; align-items: center; justify-content: center;
+  padding: 40px 20px; z-index: 200;
+}
+.lightbox-overlay img {
+  max-width: 100%; max-height: 100%; border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5); cursor: default;
+}
+.lightbox-close {
+  position: absolute; top: 18px; right: 22px; background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.3); color: #fff; width: 36px; height: 36px;
+  border-radius: 50%; font-size: 1.4rem; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.lightbox-close:hover { background: rgba(255,255,255,0.2); }
 
 .anydesk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; }
 

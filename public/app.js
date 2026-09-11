@@ -11,6 +11,42 @@ function formatDateTime(str) {
   return str.replace('T', ' ').slice(0, 16);
 }
 
+function toDateTimeLocal(str) {
+  if (!str) return '';
+  return str.replace(' ', 'T').slice(0, 16);
+}
+
+// ---- Lightbox (view attachments without leaving the page) ----
+const lightboxOverlay = document.getElementById('lightbox-overlay');
+const lightboxImg = document.getElementById('lightbox-img');
+
+function openLightbox(src, alt) {
+  lightboxImg.src = src;
+  lightboxImg.alt = alt || '';
+  lightboxOverlay.style.display = 'flex';
+}
+
+function closeLightbox() {
+  lightboxOverlay.style.display = 'none';
+  lightboxImg.src = '';
+}
+
+document.addEventListener('click', (e) => {
+  const img = e.target.closest('.lightbox-img');
+  if (img) {
+    e.preventDefault();
+    openLightbox(img.dataset.full || img.src, img.alt);
+  }
+});
+
+document.getElementById('lightbox-close').addEventListener('click', closeLightbox);
+lightboxOverlay.addEventListener('click', (e) => {
+  if (e.target === lightboxOverlay) closeLightbox();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && lightboxOverlay.style.display === 'flex') closeLightbox();
+});
+
 // ---- Tabs ----
 document.querySelectorAll('.tab-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -52,7 +88,7 @@ async function loadTickets() {
         ${t.description ? `<p>${escapeHtml(t.description)}</p>` : ''}
         ${(t.attachments && t.attachments.length) ? `
           <div class="attachment-thumbs">
-            ${t.attachments.map((a) => `<a href="uploads/${a.filename}" target="_blank"><img src="uploads/${a.filename}" alt="${escapeHtml(a.original_name)}" class="thumb" /></a>`).join('')}
+            ${t.attachments.map((a) => `<img src="uploads/${a.filename}" alt="${escapeHtml(a.original_name)}" class="thumb lightbox-img" data-full="uploads/${a.filename}" />`).join('')}
           </div>` : ''}
       </div>
       <div class="ticket-actions">
@@ -644,7 +680,7 @@ async function openTicketModal(id) {
           </div>
           <div class="field-row">
             <span class="field-label">🕐 สร้างเมื่อ</span>
-            <span class="field-static">${formatDateTime(t.created_at)}</span>
+            <input type="datetime-local" id="modal-created-at" class="field-value" value="${toDateTimeLocal(t.created_at)}" />
           </div>
           <div class="field-row">
             <span class="field-label">✏️ อัปเดตล่าสุด</span>
@@ -662,7 +698,7 @@ async function openTicketModal(id) {
           <div class="attachment-thumbs" id="modal-attachments">
             ${(t.attachments || []).map((a) => `
               <span style="position:relative;display:inline-block;">
-                <a href="uploads/${a.filename}" target="_blank"><img src="uploads/${a.filename}" class="thumb" alt="${escapeHtml(a.original_name)}" /></a>
+                <img src="uploads/${a.filename}" class="thumb lightbox-img" alt="${escapeHtml(a.original_name)}" data-full="uploads/${a.filename}" />
                 <button class="secondary modal-delete-attachment" data-id="${a.id}" style="position:absolute;top:-6px;right:-6px;padding:0 5px;border-radius:50%;">×</button>
               </span>
             `).join('') || '<span class="hint">ยังไม่มีรูป</span>'}
@@ -715,12 +751,18 @@ async function openTicketModal(id) {
   titleTextarea.addEventListener('input', autoGrow);
 
   document.getElementById('modal-save-btn').onclick = async () => {
+    const createdAtValue = document.getElementById('modal-created-at').value;
+    if (!createdAtValue) {
+      alert('กรุณาระบุวันที่สร้าง');
+      return;
+    }
     const payload = {
       title: document.getElementById('modal-title').value,
       assignee: document.getElementById('modal-assignee').value,
       status: document.getElementById('modal-status').value,
       priority: document.getElementById('modal-priority').value,
       description: document.getElementById('modal-description').value,
+      created_at: createdAtValue,
     };
     const r = await fetch(`/api/tickets/${t.id}`, {
       method: 'PUT',
