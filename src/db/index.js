@@ -1,13 +1,27 @@
 const path = require('path');
 const fs = require('fs');
-const Database = require('better-sqlite3');
+const { DatabaseSync } = require('node:sqlite');
 
 const dataDir = path.join(__dirname, '..', '..', 'data');
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
-const db = new Database(path.join(dataDir, 'tickets.db'));
+const db = new DatabaseSync(path.join(dataDir, 'tickets.db'));
 
-db.pragma('journal_mode = WAL');
+db.exec('PRAGMA journal_mode = WAL');
+
+// better-sqlite3-style helper: db.transaction(fn) returns a function that
+// runs fn inside BEGIN/COMMIT, rolling back on error.
+db.transaction = (fn) => (...args) => {
+  db.exec('BEGIN');
+  try {
+    const result = fn(...args);
+    db.exec('COMMIT');
+    return result;
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+};
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS tickets (

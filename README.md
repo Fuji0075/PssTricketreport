@@ -14,10 +14,15 @@
 
 ## เริ่มต้นใช้งาน
 
+ต้องใช้ **Node.js เวอร์ชัน 22.5 ขึ้นไป** (ใช้ฐานข้อมูล SQLite ในตัวของ Node เอง ผ่าน `node:sqlite`
+ไม่ต้องติดตั้ง native module หรือ Visual Studio Build Tools ใดๆ)
+
 ```bash
 npm install
 npm start
 ```
+
+ตอนรันจะมี warning `ExperimentalWarning: SQLite is an experimental feature` ขึ้นมา ถือเป็นเรื่องปกติ ไม่ใช่ error
 
 จากนั้นเปิดเบราว์เซอร์ไปที่ `http://localhost:3000`
 
