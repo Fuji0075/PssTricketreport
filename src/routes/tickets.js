@@ -89,18 +89,32 @@ router.post('/', async (req, res) => {
   if (!VALID_PRIORITY.includes(priority)) {
     return res.status(400).json({ error: `priority must be one of ${VALID_PRIORITY.join(', ')}` });
   }
-  const resolvedAt = status === 'done' ? new Date().toISOString() : null;
-  const result = db
-    .prepare(
-      `INSERT INTO tickets (title, description, assignee, company, status, priority, resolved_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    )
-    .run(title.trim(), description, assignee, company, status, priority, resolvedAt);
 
-  // Best-effort weather snapshot for the branch at the moment the ticket
-  // was opened; a slow/failed lookup never blocks ticket creation for long
-  // (weatherSnapshotForCompany times out on its own and resolves to null).
-  const weatherSnapshot = await weatherSnapshotForCompany(company);
+  // Optional: backdate/forward-date the ticket (e.g. logging a past
+  // incident), which also anchors which date the weather lookup uses.
+  let createdAt = null;
+  if (req.body.created_at) {
+    createdAt = normalizeDateTimeLocal(req.body.created_at);
+    if (!createdAt) {
+      return res.status(400).json({ error: 'created_at must be a valid date/time' });
+    }
+  }
+
+  const resolvedAt = status === 'done' ? new Date().toISOString() : null;
+  const result = createdAt
+    ? db.prepare(
+        `INSERT INTO tickets (title, description, assignee, company, status, priority, resolved_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(title.trim(), description, assignee, company, status, priority, resolvedAt, createdAt)
+    : db.prepare(
+        `INSERT INTO tickets (title, description, assignee, company, status, priority, resolved_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).run(title.trim(), description, assignee, company, status, priority, resolvedAt);
+
+  // Best-effort weather snapshot for the branch at the ticket's date (the
+  // chosen created_at, or now); a slow/failed lookup never blocks ticket
+  // creation for long (weatherSnapshotForCompany times out on its own).
+  const weatherSnapshot = await weatherSnapshotForCompany(company, createdAt || new Date());
   if (weatherSnapshot) {
     db.prepare('UPDATE tickets SET weather_snapshot = ? WHERE id = ?').run(weatherSnapshot, result.lastInsertRowid);
   }

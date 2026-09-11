@@ -618,6 +618,11 @@ function openCreateTicketModal() {
     <div class="form-row">
       <textarea id="modal-new-description" placeholder="รายละเอียด"></textarea>
     </div>
+    <div class="form-row" style="align-items:center; gap:10px;">
+      <label for="modal-new-created-at" style="flex:0 0 auto; font-size:0.85rem; color:var(--muted);">🕐 วันที่/เวลาเหตุการณ์</label>
+      <input type="datetime-local" id="modal-new-created-at" class="field-value" style="flex:1;" />
+    </div>
+    <p class="hint">ไม่ระบุ = ใช้เวลาปัจจุบัน ถ้าระบุ จะดึงสภาพอากาศ ณ วันที่/เวลานั้นมาบันทึกให้ (กรณีย้อนหลังแจ้งเหตุ)</p>
     <p class="hint">สร้าง ticket ก่อน แล้วค่อยแนบรูป (วาง Ctrl+V ได้) ในขั้นถัดไป</p>
     <div class="form-row">
       <button id="modal-create-btn">สร้าง Ticket</button>
@@ -639,11 +644,22 @@ function openCreateTicketModal() {
       priority: document.getElementById('modal-new-priority').value,
       description: document.getElementById('modal-new-description').value,
     };
+    const createdAtValue = document.getElementById('modal-new-created-at').value;
+    if (createdAtValue) payload.created_at = createdAtValue;
+
+    const createBtn = document.getElementById('modal-create-btn');
+    const originalLabel = createBtn.textContent;
+    createBtn.textContent = createdAtValue ? 'กำลังเช็คสภาพอากาศ...' : 'กำลังสร้าง...';
+    createBtn.disabled = true;
+
     const r = await fetch('/api/tickets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
+
+    createBtn.textContent = originalLabel;
+    createBtn.disabled = false;
     if (!r.ok) {
       const err = await r.json().catch(() => ({}));
       alert(err.error || 'เกิดข้อผิดพลาด');
