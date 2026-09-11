@@ -17,6 +17,7 @@
 - **ฟิลด์บริษัท/สาขา** ตอนเปิด ticket ใหม่ — พิมพ์แล้วมี autocomplete จากรายชื่อสาขาใน AnyDesk Directory ให้เลือก แสดงเป็นแท็กสีม่วงบนการ์ด Dashboard ด้วย
 - **การ์ด Dashboard แสดงรูปภาพ**: ถ้า ticket มีรูปแนบ รูปแรกจะขึ้นเป็นภาพหน้าปกบนการ์ด คลิกดูแบบเต็มได้เลยโดยไม่ต้องเปิดหน้าต่างรายละเอียด
 - **Knowledge Base**: บันทึกปัญหาที่เคยเจอและวิธีแก้ไว้เป็นบทความ ค้นหาได้ และในหน้าต่างรายละเอียด ticket มีปุ่ม "ค้นหาคำแนะนำ" ที่จะจับคู่คำในหัวข้อ/รายละเอียด ticket กับบทความที่ใกล้เคียงให้อัตโนมัติ — ถ้าตั้งค่า environment variable `ANTHROPIC_API_KEY` ไว้ ระบบจะเรียก Claude ให้ช่วยสรุปคำแนะนำเป็นภาษาที่อ่านง่ายด้วย (ถ้าไม่ตั้งค่าไว้ก็ยังใช้งานได้ปกติ แค่แสดงเฉพาะบทความที่ใกล้เคียง)
+- **สร้าง ticket จากกลุ่ม LINE**: เชิญ LINE Official Account เข้ากลุ่มลูกค้า แท็กชื่อบอทแล้วพิมพ์ปัญหาต่อท้าย ระบบจะสร้าง ticket ให้อัตโนมัติ พร้อมดึงชื่อกลุ่มมาใส่เป็นบริษัท/สาขา และตอบกลับในแชทพร้อมเลข ticket (ดูวิธีตั้งค่าด้านล่าง)
 
 ## เริ่มต้นใช้งาน
 
@@ -71,6 +72,52 @@ title,description,assignee,company,status,priority
 | PUT | `/api/kb/:id` | แก้ไขบทความ |
 | DELETE | `/api/kb/:id` | ลบบทความ |
 | POST | `/api/kb/recommend` | หาคำแนะนำจาก `title`/`description` — จับคู่คำกับ Knowledge Base และเรียก Claude API (ถ้าตั้งค่า `ANTHROPIC_API_KEY`) เพื่อสรุปคำแนะนำ |
+| POST | `/webhook/line` | Webhook รับข้อความจาก LINE Messaging API (ดูวิธีตั้งค่าด้านล่าง) |
+
+### เปิดใช้สร้าง ticket จากกลุ่ม LINE (ไม่บังคับ)
+
+**1. สร้าง LINE Official Account + เปิด Messaging API**
+- ไปที่ [LINE Developers Console](https://developers.line.biz/console/) → สร้าง Provider และ Channel แบบ "Messaging API" (ฟรี)
+- ในหน้า Channel → แท็บ "Messaging API" เก็บค่า 2 ตัว:
+  - **Channel secret** (อยู่ในแท็บ "Basic settings")
+  - **Channel access token** (กด "Issue" ในแท็บ "Messaging API" เพื่อออก long-lived token)
+- ในแท็บ "Messaging API" เปิดสวิตช์ **"Allow bot to join group chats"** (ปกติปิดอยู่โดย default)
+- ปิด "Auto-reply messages" และ "Greeting messages" ที่เป็นค่าเริ่มต้นของ LINE (ไม่งั้นจะชนกับข้อความตอบกลับของเรา)
+
+**2. ตั้งค่า environment variable แล้วรันเซิร์ฟเวอร์**
+```bash
+# Windows (Command Prompt)
+set LINE_CHANNEL_SECRET=your-channel-secret
+set LINE_CHANNEL_ACCESS_TOKEN=your-channel-access-token
+npm start
+
+# Windows (PowerShell)
+$env:LINE_CHANNEL_SECRET="your-channel-secret"
+$env:LINE_CHANNEL_ACCESS_TOKEN="your-channel-access-token"
+npm start
+```
+
+**3. ทำให้ webhook เข้าถึงได้จากอินเทอร์เน็ต**
+
+LINE ต้องส่ง webhook มาที่ URL แบบ `https://` ที่เข้าถึงได้จริง เซิร์ฟเวอร์ที่รันแค่ `localhost` เข้าถึงไม่ได้ ต้องเลือกอย่างใดอย่างหนึ่ง:
+- **ทดสอบชั่วคราว**: ใช้ [ngrok](https://ngrok.com/) รัน `ngrok http 3000` จะได้ URL แบบ `https://xxxx.ngrok-free.app` มาใช้ชั่วคราว
+- **ใช้งานจริง**: deploy แอปนี้ขึ้นเซิร์ฟเวอร์/VPS ที่มี HTTPS
+
+เอา URL ที่ได้ไปตั้งใน LINE Developers Console → แท็บ "Messaging API" → **Webhook URL** = `https://<your-domain>/webhook/line` แล้วกด "Verify" ให้ขึ้นสำเร็จ
+
+**4. เชิญบอทเข้ากลุ่มลูกค้า**
+
+สแกน QR code ของ OA (อยู่ในแท็บ "Messaging API") เพื่อเพิ่มเป็นเพื่อน แล้วเชิญเข้ากลุ่มไลน์ที่มีลูกค้าเหมือนเชิญเพื่อนทั่วไป
+
+**5. ใช้งาน**
+
+ในกลุ่ม พิมพ์แท็กชื่อบอท (เลือกจากที่ LINE ขึ้นให้อัตโนมัติตอนพิมพ์ `@`) ตามด้วยปัญหา เช่น:
+```
+@ชื่อบอทของคุณ เครื่องพิมพ์เสีย ไฟไม่ติดเลย
+```
+บอทจะสร้าง ticket ให้ทันที ตั้งชื่อกลุ่ม LINE เป็นบริษัท/สาขาอัตโนมัติ (ถ้าดึงชื่อได้) บันทึกชื่อผู้แจ้งไว้ในแชทของ ticket และตอบกลับในกลุ่มพร้อมเลข ticket เช่น "รับเรื่องแล้วครับ ✅ Ticket #12: เครื่องพิมพ์เสีย ไฟไม่ติดเลย"
+
+ข้อความในกลุ่มที่ไม่ได้แท็กบอทจะถูกละเว้น ไม่กลายเป็น ticket
 
 ### เปิดใช้ AI ช่วยแนะนำใน Knowledge Base (ไม่บังคับ)
 
