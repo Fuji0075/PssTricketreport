@@ -373,6 +373,7 @@ document.getElementById('anydesk-add-btn').addEventListener('click', () => openA
 function openAnydeskStoreModal(store) {
   const isEdit = !!store;
   currentModalTicketId = null;
+  document.querySelector('.modal').classList.remove('modal-wide');
   modalBody.innerHTML = `
     <h3>${isEdit ? `แก้ไขสาขา: ${escapeHtml(store.name)}` : 'เพิ่มสาขาใหม่'}</h3>
     <div class="form-row">
@@ -549,6 +550,7 @@ const modalBody = document.getElementById('modal-body');
 
 function openCreateTicketModal() {
   currentModalTicketId = null;
+  document.querySelector('.modal').classList.remove('modal-wide');
   modalBody.innerHTML = `
     <h3>เพิ่ม Ticket ใหม่</h3>
     <div class="form-row">
@@ -604,62 +606,97 @@ function openCreateTicketModal() {
 
 document.getElementById('dashboard-add-btn').addEventListener('click', openCreateTicketModal);
 
+const STATUS_COLOR_VAR = { open: '--open', 'in-progress': '--progress', 'on-hold': '--hold', done: '--done' };
+
+function paintStatusSelect(selectEl) {
+  const varName = STATUS_COLOR_VAR[selectEl.value] || '--muted';
+  selectEl.style.background = `var(${varName})`;
+  selectEl.style.color = selectEl.value === 'in-progress' ? '#3a2c00' : '#fff';
+}
+
 async function openTicketModal(id) {
   const res = await fetch(`/api/tickets/${id}`);
   if (!res.ok) return;
   const t = await res.json();
+  document.querySelector('.modal').classList.add('modal-wide');
   modalBody.innerHTML = `
-    <h3>Ticket #${t.id}</h3>
-    <div class="form-row">
-      <input type="text" id="modal-title" value="${escapeHtml(t.title)}" placeholder="หัวข้อ" />
-      <input type="text" id="modal-assignee" value="${escapeHtml(t.assignee || '')}" placeholder="ผู้รับผิดชอบ" />
-    </div>
-    <div class="form-row">
-      <select id="modal-status">
-        ${STATUS_ORDER.map((s) => `<option value="${s}" ${s === t.status ? 'selected' : ''}>${statusLabel[s]}</option>`).join('')}
-      </select>
-      <select id="modal-priority">
-        ${['low', 'medium', 'high', 'urgent'].map((p) => `<option value="${p}" ${p === t.priority ? 'selected' : ''}>${p}</option>`).join('')}
-      </select>
-    </div>
-    <div class="form-row">
-      <textarea id="modal-description" placeholder="รายละเอียด">${escapeHtml(t.description || '')}</textarea>
-    </div>
-    <div class="form-row">
-      <button id="modal-save-btn">บันทึก</button>
-      <button type="button" class="secondary" id="modal-delete-btn">ลบ Ticket</button>
-    </div>
+    <div class="task-view">
+      <div class="task-main">
+        <div class="task-breadcrumb">Ticket #${t.id}</div>
+        <textarea id="modal-title" class="task-title-input" rows="1" placeholder="หัวข้อ">${escapeHtml(t.title)}</textarea>
 
-    <div class="card">
-      <h4 style="margin-top:0">รูปภาพ</h4>
-      <div class="attachment-thumbs" id="modal-attachments">
-        ${(t.attachments || []).map((a) => `
-          <span style="position:relative;display:inline-block;">
-            <a href="uploads/${a.filename}" target="_blank"><img src="uploads/${a.filename}" class="thumb" alt="${escapeHtml(a.original_name)}" /></a>
-            <button class="secondary modal-delete-attachment" data-id="${a.id}" style="position:absolute;top:-6px;right:-6px;padding:0 5px;border-radius:50%;">×</button>
-          </span>
-        `).join('') || '<span class="hint">ยังไม่มีรูป</span>'}
-      </div>
-      <div class="form-row" style="align-items:center; margin-top:8px;">
-        <button type="button" class="secondary" id="modal-photo-btn">+ เพิ่มรูป</button>
-        <span class="hint">หรือวางรูปที่ก็อปมา (Ctrl+V / คลิกขวา &gt; วาง) ได้เลย</span>
-      </div>
-      <div id="modal-paste-status" class="hint"></div>
-    </div>
-
-    <div class="card">
-      <h4 style="margin-top:0">💬 แชท / บันทึกงานเพิ่มเติม</h4>
-      <div class="chat-thread" id="modal-chat-thread">
-        ${(t.notes || []).slice().reverse().map((n) => `
-          <div class="chat-bubble">
-            <div class="chat-bubble-text">${escapeHtml(n.note)}</div>
-            <div class="chat-bubble-meta">${formatDateTime(n.created_at)}</div>
+        <div class="field-grid">
+          <div class="field-row">
+            <span class="field-label">🚦 Status</span>
+            <select id="modal-status" class="status-select">
+              ${STATUS_ORDER.map((s) => `<option value="${s}" ${s === t.status ? 'selected' : ''}>${statusLabel[s]}</option>`).join('')}
+            </select>
           </div>
-        `).join('') || '<div class="empty">ยังไม่มีข้อความ พิมพ์เพื่อบันทึกงานเพิ่มเติม</div>'}
+          <div class="field-row">
+            <span class="field-label">👤 ผู้รับผิดชอบ</span>
+            <input type="text" id="modal-assignee" class="field-value" value="${escapeHtml(t.assignee || '')}" placeholder="ยังไม่ระบุ" />
+          </div>
+          <div class="field-row">
+            <span class="field-label">🚩 Priority</span>
+            <select id="modal-priority" class="field-value">
+              ${['low', 'medium', 'high', 'urgent'].map((p) => `<option value="${p}" ${p === t.priority ? 'selected' : ''}>${p}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field-row">
+            <span class="field-label">🕐 สร้างเมื่อ</span>
+            <span class="field-static">${formatDateTime(t.created_at)}</span>
+          </div>
+          <div class="field-row">
+            <span class="field-label">✏️ อัปเดตล่าสุด</span>
+            <span class="field-static">${formatDateTime(t.updated_at)}</span>
+          </div>
+        </div>
+
+        <div class="task-description">
+          <label>รายละเอียด</label>
+          <textarea id="modal-description" placeholder="เพิ่มรายละเอียด...">${escapeHtml(t.description || '')}</textarea>
+        </div>
+
+        <div class="task-attachments">
+          <label>รูปภาพ</label>
+          <div class="attachment-thumbs" id="modal-attachments">
+            ${(t.attachments || []).map((a) => `
+              <span style="position:relative;display:inline-block;">
+                <a href="uploads/${a.filename}" target="_blank"><img src="uploads/${a.filename}" class="thumb" alt="${escapeHtml(a.original_name)}" /></a>
+                <button class="secondary modal-delete-attachment" data-id="${a.id}" style="position:absolute;top:-6px;right:-6px;padding:0 5px;border-radius:50%;">×</button>
+              </span>
+            `).join('') || '<span class="hint">ยังไม่มีรูป</span>'}
+          </div>
+          <div class="form-row" style="align-items:center; margin-top:8px;">
+            <button type="button" class="secondary" id="modal-photo-btn">+ เพิ่มรูป</button>
+            <span class="hint">หรือวางรูปที่ก็อปมา (Ctrl+V) ได้เลย</span>
+          </div>
+          <div id="modal-paste-status" class="hint"></div>
+        </div>
+
+        <div class="task-main-actions">
+          <button id="modal-save-btn">บันทึก</button>
+          <button type="button" class="secondary" id="modal-delete-btn">ลบ Ticket</button>
+        </div>
       </div>
-      <div class="form-row chat-input-row">
-        <input type="text" id="modal-note-input" placeholder="พิมพ์ข้อความ แล้วกด Enter หรือกดปุ่มส่ง..." />
-        <button type="button" id="modal-add-note-btn">ส่ง</button>
+
+      <div class="task-activity">
+        <div class="activity-header">Activity</div>
+        <div class="activity-thread" id="modal-chat-thread">
+          ${(t.notes || []).slice().reverse().map((n) => `
+            <div class="activity-item">
+              <div class="activity-avatar">🎫</div>
+              <div class="activity-content">
+                <div class="activity-meta"><strong>คุณ</strong> · <span class="activity-time">${formatDateTime(n.created_at)}</span></div>
+                <div class="activity-text">${escapeHtml(n.note)}</div>
+              </div>
+            </div>
+          `).join('') || '<div class="empty">ยังไม่มีความเคลื่อนไหว พิมพ์ด้านล่างเพื่อบันทึก</div>'}
+        </div>
+        <div class="activity-input">
+          <input type="text" id="modal-note-input" placeholder="Write a comment..." />
+          <button type="button" id="modal-add-note-btn">Send</button>
+        </div>
       </div>
     </div>
   `;
@@ -667,6 +704,15 @@ async function openTicketModal(id) {
   const chatThreadEl = document.getElementById('modal-chat-thread');
   if (chatThreadEl) chatThreadEl.scrollTop = chatThreadEl.scrollHeight;
   currentModalTicketId = t.id;
+
+  const statusSelectEl = document.getElementById('modal-status');
+  paintStatusSelect(statusSelectEl);
+  statusSelectEl.addEventListener('change', () => paintStatusSelect(statusSelectEl));
+
+  const titleTextarea = document.getElementById('modal-title');
+  const autoGrow = () => { titleTextarea.style.height = 'auto'; titleTextarea.style.height = `${titleTextarea.scrollHeight}px`; };
+  autoGrow();
+  titleTextarea.addEventListener('input', autoGrow);
 
   document.getElementById('modal-save-btn').onclick = async () => {
     const payload = {
@@ -742,6 +788,7 @@ async function openTicketModal(id) {
 function closeModal() {
   modalOverlay.style.display = 'none';
   modalBody.innerHTML = '';
+  document.querySelector('.modal').classList.remove('modal-wide');
   currentModalTicketId = null;
 }
 
