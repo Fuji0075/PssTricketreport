@@ -58,7 +58,8 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
     note TEXT,
-    program TEXT NOT NULL DEFAULT 'AnyDesk'
+    program TEXT NOT NULL DEFAULT 'AnyDesk',
+    weather_location TEXT
   );
 
   CREATE TABLE IF NOT EXISTS anydesk_devices (
@@ -84,6 +85,22 @@ const anydeskColumns = db.prepare('PRAGMA table_info(anydesk_stores)').all();
 if (!anydeskColumns.some((c) => c.name === 'program')) {
   db.exec("ALTER TABLE anydesk_stores ADD COLUMN program TEXT NOT NULL DEFAULT 'AnyDesk'");
 }
+if (!anydeskColumns.some((c) => c.name === 'weather_location')) {
+  db.exec('ALTER TABLE anydesk_stores ADD COLUMN weather_location TEXT');
+}
+
+// Known branch names that are roads/areas rather than an official place
+// Open-Meteo's geocoder recognizes (e.g. "ราชพฤกษ์" is a road, not a
+// district) — seed a working search term for them. Only fills rows that
+// don't already have an override, so it never clobbers a manual edit.
+const WEATHER_LOCATION_OVERRIDES = {
+  'โรบินสันราชพฤกษ์': 'ปากเกร็ด', // actual address: Pak Kret District, Nonthaburi 11120
+};
+Object.entries(WEATHER_LOCATION_OVERRIDES).forEach(([name, location]) => {
+  db.prepare(
+    'UPDATE anydesk_stores SET weather_location = ? WHERE name = ? AND weather_location IS NULL'
+  ).run(location, name);
+});
 
 // Migration for databases created before the `company` column existed.
 const ticketColumns = db.prepare('PRAGMA table_info(tickets)').all();
@@ -102,14 +119,16 @@ function seedAnydeskDirectory() {
   if (!fs.existsSync(seedPath)) return;
 
   const stores = JSON.parse(fs.readFileSync(seedPath, 'utf-8'));
-  const insertStore = db.prepare('INSERT INTO anydesk_stores (name, note, program) VALUES (?, ?, ?)');
+  const insertStore = db.prepare(
+    'INSERT INTO anydesk_stores (name, note, program, weather_location) VALUES (?, ?, ?, ?)'
+  );
   const insertDevice = db.prepare(
     'INSERT INTO anydesk_devices (store_id, label, device_id) VALUES (?, ?, ?)'
   );
 
   const seedAll = db.transaction((items) => {
     items.forEach((store) => {
-      const result = insertStore.run(store.name, store.note || null, store.program || 'AnyDesk');
+      const result = insertStore.run(store.name, store.note || null, store.program || 'AnyDesk', store.weather_location || null);
       (store.devices || []).forEach((d) => {
         insertDevice.run(result.lastInsertRowid, d.label, d.id);
       });

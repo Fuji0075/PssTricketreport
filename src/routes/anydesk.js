@@ -19,11 +19,11 @@ router.get('/', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const { name, note = '', program = 'AnyDesk', devices = [] } = req.body;
+  const { name, note = '', program = 'AnyDesk', weather_location = '', devices = [] } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: 'name is required' });
   const result = db
-    .prepare('INSERT INTO anydesk_stores (name, note, program) VALUES (?, ?, ?)')
-    .run(name.trim(), note || null, program || 'AnyDesk');
+    .prepare('INSERT INTO anydesk_stores (name, note, program, weather_location) VALUES (?, ?, ?, ?)')
+    .run(name.trim(), note || null, program || 'AnyDesk', weather_location.trim() || null);
   const insertDevice = db.prepare('INSERT INTO anydesk_devices (store_id, label, device_id) VALUES (?, ?, ?)');
   devices.forEach((d) => {
     if (d.label && d.id) insertDevice.run(result.lastInsertRowid, d.label, d.id);
@@ -39,8 +39,11 @@ router.put('/:id', (req, res) => {
   const name = req.body.name ?? existing.name;
   const note = req.body.note ?? existing.note;
   const program = req.body.program ?? existing.program;
-  db.prepare('UPDATE anydesk_stores SET name = ?, note = ?, program = ? WHERE id = ?').run(
-    name, note, program, req.params.id
+  const weatherLocation = req.body.weather_location !== undefined
+    ? (req.body.weather_location.trim() || null)
+    : existing.weather_location;
+  db.prepare('UPDATE anydesk_stores SET name = ?, note = ?, program = ?, weather_location = ? WHERE id = ?').run(
+    name, note, program, weatherLocation, req.params.id
   );
   const store = db.prepare('SELECT * FROM anydesk_stores WHERE id = ?').get(req.params.id);
   const storeDevices = db.prepare('SELECT id, label, device_id FROM anydesk_devices WHERE store_id = ?').all(store.id);

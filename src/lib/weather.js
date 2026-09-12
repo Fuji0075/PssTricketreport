@@ -1,8 +1,15 @@
-// Best-effort weather snapshot for a ticket's branch at a given date/time,
-// looked up from the location word that follows "โรบินสัน"/"Robinson" in
-// the company field (e.g. "โรบินสัน ถลาง" -> "ถลาง"). Uses Open-Meteo,
-// which needs no API key and covers both forecast (today/future) and
-// historical (past) dates via two separate endpoints.
+// Best-effort weather snapshot for a ticket's branch at a given date/time.
+// Normally derived from the location word that follows
+// "โรบินสัน"/"Robinson" in the company field (e.g. "โรบินสัน ถลาง" ->
+// "ถลาง"), but that guess is wrong whenever the branch name is a road or
+// area rather than an official place (e.g. "ราชพฤกษ์" is a road, so
+// Open-Meteo's geocoder can't find it at all) — anydesk_stores.weather_location
+// lets a specific branch override the search term used, edited from the
+// AnyDesk directory UI. Uses Open-Meteo, which needs no API key and covers
+// both forecast (today/future) and historical (past) dates via two
+// separate endpoints.
+
+const db = require('../db');
 
 const KNOWN_PREFIXES = [/anydesk/gi, /robinson/gi, /โรบินสัน/g];
 
@@ -12,6 +19,13 @@ function extractLocationKeyword(company) {
   KNOWN_PREFIXES.forEach((re) => { text = text.replace(re, ''); });
   text = text.trim().replace(/\s+/g, ' ');
   return text || null;
+}
+
+function resolveWeatherLocation(company) {
+  if (!company) return null;
+  const store = db.prepare('SELECT weather_location FROM anydesk_stores WHERE name = ?').get(company);
+  if (store && store.weather_location) return store.weather_location;
+  return extractLocationKeyword(company);
 }
 
 // WMO weather codes, as used by Open-Meteo's `weathercode` field.
@@ -107,7 +121,7 @@ async function fetchWeatherAt(location, when) {
 }
 
 async function weatherSnapshotForCompany(company, when) {
-  const location = extractLocationKeyword(company);
+  const location = resolveWeatherLocation(company);
   if (!location) return null;
   return fetchWeatherAt(location, when);
 }

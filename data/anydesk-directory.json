@@ -137,6 +137,7 @@
     "name": "โรบินสันราชพฤกษ์",
     "note": null,
     "program": "PSS GO",
+    "weather_location": "ปากเกร็ด",
     "devices": [
       { "kind": "Admin", "id": "1216723247", "label": "Admin" },
       { "kind": "Entry", "id": "1530097692", "label": "Entry" },

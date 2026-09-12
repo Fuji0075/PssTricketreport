@@ -481,6 +481,10 @@ function openAnydeskStoreModal(store) {
     </div>
     <p class="hint">โปรแกรม = แอปที่ต้องเปิดเพื่อรีโมทเข้าสาขานี้ (AnyDesk ปกติ หรือ PSS GO)</p>
     <div class="form-row">
+      <input type="text" id="anydesk-modal-weather-location" placeholder="คำค้นหาสภาพอากาศ (ถ้าชื่อสาขาหาที่ตั้งไม่เจอ)" value="${isEdit ? escapeHtml(store.weather_location || '') : ''}" />
+    </div>
+    <p class="hint">ปกติระบบตัดคำหลัง "โรบินสัน" มาค้นหาสภาพอากาศให้อัตโนมัติ แต่ถ้าชื่อสาขาเป็นชื่อถนน/ย่าน (เช่น "ราชพฤกษ์") มักหาที่ตั้งไม่เจอ ใส่ชื่ออำเภอ/จังหวัดที่ถูกต้องตรงนี้แทนได้</p>
+    <div class="form-row">
       <button id="anydesk-modal-save-btn">${isEdit ? 'บันทึก' : 'สร้างสาขา'}</button>
     </div>
   `;
@@ -496,6 +500,7 @@ function openAnydeskStoreModal(store) {
       name,
       program: document.getElementById('anydesk-modal-program').value,
       note: document.getElementById('anydesk-modal-note').value.trim(),
+      weather_location: document.getElementById('anydesk-modal-weather-location').value.trim(),
     };
     const url = isEdit ? `/api/anydesk/${store.id}` : '/api/anydesk';
     const method = isEdit ? 'PUT' : 'POST';
