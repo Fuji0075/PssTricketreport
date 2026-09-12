@@ -210,6 +210,37 @@ document.getElementById('refresh-tickets').addEventListener('click', loadTickets
 const summaryDateInput = document.getElementById('summary-date');
 summaryDateInput.value = new Date().toISOString().slice(0, 10);
 
+const THAI_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
+function buildDailySummaryText(data) {
+  const d = new Date(`${data.date}T00:00:00`);
+  const beYear = (d.getFullYear() + 543) % 100;
+  const header = `วันที่ ${d.getDate()} ${THAI_MONTHS_SHORT[d.getMonth()]} ${beYear}`;
+
+  const notesByTicket = {};
+  (data.notes || []).forEach((n) => {
+    (notesByTicket[n.ticket_id] = notesByTicket[n.ticket_id] || []).push(n.note);
+  });
+
+  const tickets = [...(data.touchedTickets || [])].sort((a, b) => a.id - b.id);
+
+  const lines = [header, ''];
+  tickets.forEach((t, i) => {
+    lines.push(`${i + 1}. ${t.title}`);
+    const noteLines = notesByTicket[t.id];
+    if (noteLines && noteLines.length) {
+      noteLines.forEach((n) => lines.push(`- ${n}`));
+    } else if (t.description) {
+      lines.push(`- ${t.description}`);
+    }
+    lines.push('');
+  });
+
+  if (tickets.length === 0) lines.push('(ไม่มี ticket ที่มีความเคลื่อนไหววันนี้)');
+
+  return lines.join('\n').trim();
+}
+
 async function loadSummary() {
   const date = summaryDateInput.value;
   const res = await fetch(`/api/summary/daily?date=${date}`);
@@ -219,7 +250,17 @@ async function loadSummary() {
   const statusCountMap = {};
   data.overallStatusCounts.forEach((s) => { statusCountMap[s.status] = s.count; });
 
+  const summaryText = buildDailySummaryText(data);
+
   el.innerHTML = `
+    <div class="card">
+      <h3>📋 สรุปสำหรับแจ้งในไลน์</h3>
+      <textarea id="summary-text-output" readonly class="summary-text-output">${escapeHtml(summaryText)}</textarea>
+      <div class="form-row" style="margin-top:8px;">
+        <button type="button" id="copy-summary-btn">คัดลอกข้อความ</button>
+      </div>
+    </div>
+
     <div class="stat-grid">
       <div class="stat"><span class="num">${data.createdCount}</span><span class="label">Ticket ใหม่</span></div>
       <div class="stat"><span class="num">${data.resolvedCount}</span><span class="label">ปิดงานแล้ว</span></div>
@@ -265,6 +306,19 @@ async function loadSummary() {
         </div>`).join('') : '<div class="empty">ไม่มีบันทึก</div>'}
     </div>
   `;
+
+  document.getElementById('copy-summary-btn').addEventListener('click', () => {
+    const textarea = document.getElementById('summary-text-output');
+    const btn = document.getElementById('copy-summary-btn');
+    navigator.clipboard.writeText(textarea.value).then(() => {
+      const original = btn.textContent;
+      btn.textContent = '✓ คัดลอกแล้ว';
+      setTimeout(() => { btn.textContent = original; }, 1500);
+    }).catch(() => {
+      textarea.select();
+      document.execCommand('copy');
+    });
+  });
 }
 
 document.getElementById('load-summary').addEventListener('click', loadSummary);
