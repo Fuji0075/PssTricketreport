@@ -102,6 +102,7 @@ const WEATHER_LOCATION_OVERRIDES = {
   'โรบินสันราชพฤกษ์': 'ปากเกร็ด', // actual address: Pak Kret District, Nonthaburi 11120
   'โรบินสัน ลาดกระบัง สุวรรณภูมิ': 'ลาดกระบัง กรุงเทพ', // actual address: Lat Krabang Rd, Lat Krabang, Bangkok 10520
   'โรบินสัน สระบุรี': 'เมืองสระบุรี', // actual address: Mittraphap Rd, Mueang Saraburi District, Saraburi 18000
+  'โรบินสัน ฉะเชิงเทรา': 'เมืองฉะเชิงเทรา', // actual address: Chachoengsao-Bangpakong Rd, Mueang Chachoengsao District, Chachoengsao 24000
 };
 Object.entries(WEATHER_LOCATION_OVERRIDES).forEach(([name, location]) => {
   db.prepare(
