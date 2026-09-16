@@ -59,6 +59,7 @@
     "name": "โรบินสัน สระบุรี",
     "note": null,
     "program": "PSS GO",
+    "weather_location": "เมืองสระบุรี",
     "devices": [
       { "kind": "Admin", "id": "1027644799", "label": "Admin" },
       { "kind": "Entry", "id": "1554822862", "label": "Entry" },
@@ -103,6 +104,7 @@
     "name": "โรบินสัน ลาดกระบัง สุวรรณภูมิ",
     "note": null,
     "program": "PSS GO",
+    "weather_location": "ลาดกระบัง กรุงเทพ",
     "devices": [
       { "kind": "Admin", "id": "597806690", "label": "Admin" },
       { "kind": "Entry", "id": "151916777", "label": "Entry" },
