@@ -258,6 +258,7 @@ async function loadSummary() {
       <textarea id="summary-text-output" readonly class="summary-text-output">${escapeHtml(summaryText)}</textarea>
       <div class="form-row" style="margin-top:8px;">
         <button type="button" id="copy-summary-btn">คัดลอกข้อความ</button>
+        <button type="button" id="send-discord-btn" style="display:none;">ส่งไป Discord</button>
       </div>
     </div>
 
@@ -318,6 +319,29 @@ async function loadSummary() {
       textarea.select();
       document.execCommand('copy');
     });
+  });
+
+  const discordBtn = document.getElementById('send-discord-btn');
+  fetch('/api/discord/status').then((r) => r.json()).then((s) => {
+    if (s.configured) discordBtn.style.display = '';
+  }).catch(() => {});
+
+  discordBtn.addEventListener('click', async () => {
+    discordBtn.disabled = true;
+    const original = discordBtn.textContent;
+    discordBtn.textContent = 'กำลังส่ง...';
+    try {
+      const res = await fetch('/api/discord/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date }),
+      });
+      if (!res.ok) throw new Error();
+      discordBtn.textContent = '✓ ส่งแล้ว';
+    } catch {
+      discordBtn.textContent = '✗ ส่งไม่สำเร็จ';
+    }
+    setTimeout(() => { discordBtn.textContent = original; discordBtn.disabled = false; }, 2000);
   });
 }
 

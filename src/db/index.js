@@ -78,6 +78,11 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS app_state (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  );
 `);
 
 // Migration for databases created before the `program` column existed.
@@ -138,5 +143,19 @@ function seedAnydeskDirectory() {
 }
 
 seedAnydeskDirectory();
+
+function getAppState(key) {
+  const row = db.prepare('SELECT value FROM app_state WHERE key = ?').get(key);
+  return row ? row.value : null;
+}
+
+function setAppState(key, value) {
+  db.prepare(
+    'INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+  ).run(key, value);
+}
+
+db.getAppState = getAppState;
+db.setAppState = setAppState;
 
 module.exports = db;

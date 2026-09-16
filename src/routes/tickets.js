@@ -5,6 +5,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const db = require('../db');
 const { weatherSnapshotForCompany } = require('../lib/weather');
+const { sendDiscordMessage, buildNewTicketMessage } = require('../lib/discord');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -121,6 +122,9 @@ router.post('/', async (req, res) => {
 
   const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(ticket);
+
+  // Fire-and-forget: never let a slow/failed Discord webhook delay the response.
+  sendDiscordMessage(buildNewTicketMessage(ticket)).catch(() => {});
 });
 
 function normalizeDateTimeLocal(value) {
