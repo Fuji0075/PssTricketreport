@@ -1,10 +1,11 @@
 const express = require('express');
 const db = require('../db');
+const { todayThaiStr } = require('../lib/thaiTime');
 
 const router = express.Router();
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return todayThaiStr();
 }
 
 // Extracted so the Discord daily-summary scheduler can reuse the exact same
@@ -48,9 +49,9 @@ function getDailySummaryData(date, staleDays = 2) {
 
   const pending = db
     .prepare(
-      `SELECT *, CAST(julianday('now') - julianday(updated_at) AS INTEGER) AS days_stale
+      `SELECT *, CAST(julianday(datetime('now', '+7 hours')) - julianday(updated_at) AS INTEGER) AS days_stale
        FROM tickets
-       WHERE status NOT IN ('done', 'on-hold') AND julianday('now') - julianday(updated_at) >= ?
+       WHERE status NOT IN ('done', 'on-hold') AND julianday(datetime('now', '+7 hours')) - julianday(updated_at) >= ?
        ORDER BY updated_at ASC`
     )
     .all(staleDays);
@@ -82,9 +83,9 @@ router.get('/pending', (req, res) => {
   const staleDays = Number(req.query.staleDays) || 2;
   const pending = db
     .prepare(
-      `SELECT *, CAST(julianday('now') - julianday(updated_at) AS INTEGER) AS days_stale
+      `SELECT *, CAST(julianday(datetime('now', '+7 hours')) - julianday(updated_at) AS INTEGER) AS days_stale
        FROM tickets
-       WHERE status NOT IN ('done', 'on-hold') AND julianday('now') - julianday(updated_at) >= ?
+       WHERE status NOT IN ('done', 'on-hold') AND julianday(datetime('now', '+7 hours')) - julianday(updated_at) >= ?
        ORDER BY updated_at ASC`
     )
     .all(staleDays);

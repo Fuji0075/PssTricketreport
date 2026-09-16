@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const db = require('../db');
 const { weatherSnapshotForCompany } = require('../lib/weather');
 const { sendNewTicketMessage, buildNewTicketMessage } = require('../lib/discord');
+const { nowThaiString } = require('../lib/thaiTime');
 
 const router = express.Router();
 
@@ -80,17 +81,18 @@ function extractTicketText(message) {
 }
 
 async function createTicketFromLine({ title, description, company, reporterNote }) {
+  const now = nowThaiString();
   const result = db
     .prepare(
-      `INSERT INTO tickets (title, description, assignee, company, status, priority)
-       VALUES (?, ?, '', ?, 'open', 'medium')`
+      `INSERT INTO tickets (title, description, assignee, company, status, priority, created_at, updated_at)
+       VALUES (?, ?, '', ?, 'open', 'medium', ?, ?)`
     )
-    .run(title, description, company || '');
+    .run(title, description, company || '', now, now);
   const ticketId = result.lastInsertRowid;
   if (reporterNote) {
-    db.prepare('INSERT INTO ticket_notes (ticket_id, note) VALUES (?, ?)').run(ticketId, reporterNote);
+    db.prepare('INSERT INTO ticket_notes (ticket_id, note, created_at) VALUES (?, ?, ?)').run(ticketId, reporterNote, now);
   }
-  const weatherSnapshot = await weatherSnapshotForCompany(company);
+  const weatherSnapshot = await weatherSnapshotForCompany(company, now);
   if (weatherSnapshot) {
     db.prepare('UPDATE tickets SET weather_snapshot = ? WHERE id = ?').run(weatherSnapshot, ticketId);
   }

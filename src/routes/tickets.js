@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const db = require('../db');
 const { weatherSnapshotForCompany } = require('../lib/weather');
 const { sendNewTicketMessage, buildNewTicketMessage } = require('../lib/discord');
+const { nowThaiString } = require('../lib/thaiTime');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -101,21 +102,17 @@ router.post('/', async (req, res) => {
     }
   }
 
-  const resolvedAt = status === 'done' ? new Date().toISOString() : null;
-  const result = createdAt
-    ? db.prepare(
-        `INSERT INTO tickets (title, description, assignee, company, status, priority, resolved_at, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(title.trim(), description, assignee, company, status, priority, resolvedAt, createdAt)
-    : db.prepare(
-        `INSERT INTO tickets (title, description, assignee, company, status, priority, resolved_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).run(title.trim(), description, assignee, company, status, priority, resolvedAt);
+  const effectiveCreatedAt = createdAt || nowThaiString();
+  const resolvedAt = status === 'done' ? nowThaiString() : null;
+  const result = db.prepare(
+    `INSERT INTO tickets (title, description, assignee, company, status, priority, resolved_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(title.trim(), description, assignee, company, status, priority, resolvedAt, effectiveCreatedAt, effectiveCreatedAt);
 
   // Best-effort weather snapshot for the branch at the ticket's date (the
   // chosen created_at, or now); a slow/failed lookup never blocks ticket
   // creation for long (weatherSnapshotForCompany times out on its own).
-  const weatherSnapshot = await weatherSnapshotForCompany(company, createdAt || new Date());
+  const weatherSnapshot = await weatherSnapshotForCompany(company, effectiveCreatedAt);
   if (weatherSnapshot) {
     db.prepare('UPDATE tickets SET weather_snapshot = ? WHERE id = ?').run(weatherSnapshot, result.lastInsertRowid);
   }
@@ -166,15 +163,15 @@ router.put('/:id', (req, res) => {
 
   let resolvedAt = existing.resolved_at;
   if (status === 'done' && existing.status !== 'done') {
-    resolvedAt = new Date().toISOString();
+    resolvedAt = nowThaiString();
   } else if (status !== 'done') {
     resolvedAt = null;
   }
 
   db.prepare(
     `UPDATE tickets SET title = ?, description = ?, assignee = ?, company = ?, status = ?, priority = ?,
-     created_at = ?, resolved_at = ?, updated_at = datetime('now') WHERE id = ?`
-  ).run(title, description, assignee, company, status, priority, createdAt, resolvedAt, req.params.id);
+     created_at = ?, resolved_at = ?, updated_at = ? WHERE id = ?`
+  ).run(title, description, assignee, company, status, priority, createdAt, resolvedAt, nowThaiString(), req.params.id);
 
   const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.id);
   res.json(ticket);
@@ -202,7 +199,7 @@ router.post('/:id/attachments', imageUpload.single('image'), (req, res) => {
       'INSERT INTO ticket_attachments (ticket_id, filename, original_name, mime_type) VALUES (?, ?, ?, ?)'
     )
     .run(req.params.id, req.file.filename, req.file.originalname, req.file.mimetype);
-  db.prepare(`UPDATE tickets SET updated_at = datetime('now') WHERE id = ?`).run(req.params.id);
+  db.prepare(`UPDATE tickets SET updated_at = ? WHERE id = ?`).run(nowThaiString(), req.params.id);
   const attachment = db.prepare('SELECT * FROM ticket_attachments WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(attachment);
 });
@@ -223,9 +220,9 @@ router.post('/:id/notes', (req, res) => {
   const { note } = req.body;
   if (!note || !note.trim()) return res.status(400).json({ error: 'note is required' });
   const result = db
-    .prepare('INSERT INTO ticket_notes (ticket_id, note) VALUES (?, ?)')
-    .run(req.params.id, note.trim());
-  db.prepare(`UPDATE tickets SET updated_at = datetime('now') WHERE id = ?`).run(req.params.id);
+    .prepare('INSERT INTO ticket_notes (ticket_id, note, created_at) VALUES (?, ?, ?)')
+    .run(req.params.id, note.trim(), nowThaiString());
+  db.prepare(`UPDATE tickets SET updated_at = ? WHERE id = ?`).run(nowThaiString(), req.params.id);
   const created = db.prepare('SELECT * FROM ticket_notes WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(created);
 });
@@ -250,8 +247,8 @@ router.post('/import', upload.single('file'), (req, res) => {
   const rows = parseCsv(text);
 
   const insert = db.prepare(
-    `INSERT INTO tickets (title, description, assignee, company, status, priority, resolved_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO tickets (title, description, assignee, company, status, priority, resolved_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
 
   let imported = 0;
@@ -265,8 +262,9 @@ router.post('/import', upload.single('file'), (req, res) => {
       }
       const status = VALID_STATUS.includes(row.status) ? row.status : 'open';
       const priority = VALID_PRIORITY.includes(row.priority) ? row.priority : 'medium';
-      const resolvedAt = status === 'done' ? new Date().toISOString() : null;
-      insert.run(title, row.description || '', row.assignee || '', row.company || '', status, priority, resolvedAt);
+      const now = nowThaiString();
+      const resolvedAt = status === 'done' ? now : null;
+      insert.run(title, row.description || '', row.assignee || '', row.company || '', status, priority, resolvedAt, now, now);
       imported += 1;
     });
   });

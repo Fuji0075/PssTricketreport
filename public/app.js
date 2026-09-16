@@ -16,6 +16,12 @@ function toDateTimeLocal(str) {
   return str.replace(' ', 'T').slice(0, 16);
 }
 
+// Today's date in Thailand's timezone — used as the default for date pickers
+// regardless of the viewer's own device timezone/clock setting.
+function todayThaiDateStr() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+}
+
 // ---- Lightbox (view attachments without leaving the page) ----
 const lightboxOverlay = document.getElementById('lightbox-overlay');
 const lightboxImg = document.getElementById('lightbox-img');
@@ -208,7 +214,7 @@ document.getElementById('refresh-tickets').addEventListener('click', loadTickets
 
 // ---- Summary ----
 const summaryDateInput = document.getElementById('summary-date');
-summaryDateInput.value = new Date().toISOString().slice(0, 10);
+summaryDateInput.value = todayThaiDateStr();
 
 const THAI_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 
@@ -365,7 +371,7 @@ document.getElementById('load-summary').addEventListener('click', loadSummary);
 
 // ---- Branch summary (per company/site, same data as Daily Summary grouped by company) ----
 const branchSummaryDateInput = document.getElementById('branch-summary-date');
-branchSummaryDateInput.value = new Date().toISOString().slice(0, 10);
+branchSummaryDateInput.value = todayThaiDateStr();
 
 async function loadBranchSummary() {
   const date = branchSummaryDateInput.value;

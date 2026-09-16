@@ -10,6 +10,7 @@ const discordRouter = require('./routes/discord');
 const { isDailySummaryConfigured, sendDailySummaryMessage } = require('./lib/discord');
 const { buildDailySummaryText } = require('./lib/dailySummaryText');
 const { getDailySummaryData, todayStr } = require('./routes/summary');
+const { nowThaiHourMinute } = require('./lib/thaiTime');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -49,11 +50,11 @@ async function checkAndSendScheduledSummary() {
   const [targetHour, targetMinute] = DAILY_SUMMARY_TIME.split(':').map(Number);
   if (!Number.isFinite(targetHour) || !Number.isFinite(targetMinute)) return;
 
-  const now = new Date();
+  const { hour, minute } = nowThaiHourMinute();
   const today = todayStr();
   if (db.getAppState(LAST_SENT_KEY) === today) return;
-  if (now.getHours() < targetHour) return;
-  if (now.getHours() === targetHour && now.getMinutes() < targetMinute) return;
+  if (hour < targetHour) return;
+  if (hour === targetHour && minute < targetMinute) return;
 
   const data = getDailySummaryData(today);
   const text = buildDailySummaryText(data);

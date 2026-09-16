@@ -10,6 +10,7 @@
 // separate endpoints.
 
 const db = require('../db');
+const { nowThaiString, todayThaiStr } = require('./thaiTime');
 
 const KNOWN_PREFIXES = [/anydesk/gi, /robinson/gi, /โรบินสัน/g];
 
@@ -90,11 +91,10 @@ async function fetchWeatherAt(location, when) {
   const geo = await geocodeLocation(location);
   if (!geo) return null;
 
-  const { dateStr, hour } = splitDateAndHour(when || new Date());
+  const { dateStr, hour } = splitDateAndHour(when || nowThaiString());
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return null;
 
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const isPast = dateStr < todayStr;
+  const isPast = dateStr < todayThaiStr();
   const base = isPast
     ? 'https://archive-api.open-meteo.com/v1/archive'
     : 'https://api.open-meteo.com/v1/forecast';

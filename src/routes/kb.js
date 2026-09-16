@@ -1,5 +1,6 @@
 const express = require('express');
 const db = require('../db');
+const { nowThaiString } = require('../lib/thaiTime');
 
 const router = express.Router();
 
@@ -25,9 +26,10 @@ router.post('/', (req, res) => {
   const { title, problem = '', solution, tags = '' } = req.body;
   if (!title || !title.trim()) return res.status(400).json({ error: 'title is required' });
   if (!solution || !solution.trim()) return res.status(400).json({ error: 'solution is required' });
+  const now = nowThaiString();
   const result = db
-    .prepare('INSERT INTO kb_articles (title, problem, solution, tags) VALUES (?, ?, ?, ?)')
-    .run(title.trim(), problem, solution.trim(), tags);
+    .prepare('INSERT INTO kb_articles (title, problem, solution, tags, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(title.trim(), problem, solution.trim(), tags, now, now);
   const article = db.prepare('SELECT * FROM kb_articles WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(article);
 });
@@ -40,8 +42,8 @@ router.put('/:id', (req, res) => {
   const solution = req.body.solution ?? existing.solution;
   const tags = req.body.tags ?? existing.tags;
   db.prepare(
-    `UPDATE kb_articles SET title = ?, problem = ?, solution = ?, tags = ?, updated_at = datetime('now') WHERE id = ?`
-  ).run(title, problem, solution, tags, req.params.id);
+    `UPDATE kb_articles SET title = ?, problem = ?, solution = ?, tags = ?, updated_at = ? WHERE id = ?`
+  ).run(title, problem, solution, tags, nowThaiString(), req.params.id);
   const article = db.prepare('SELECT * FROM kb_articles WHERE id = ?').get(req.params.id);
   res.json(article);
 });

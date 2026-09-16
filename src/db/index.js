@@ -32,8 +32,8 @@ db.exec(`
     company TEXT,
     status TEXT NOT NULL DEFAULT 'open',
     priority TEXT NOT NULL DEFAULT 'medium',
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now', '+7 hours')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now', '+7 hours')),
     resolved_at TEXT,
     weather_snapshot TEXT
   );
@@ -42,7 +42,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ticket_id INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
     note TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now', '+7 hours'))
   );
 
   CREATE TABLE IF NOT EXISTS ticket_attachments (
@@ -51,7 +51,7 @@ db.exec(`
     filename TEXT NOT NULL,
     original_name TEXT NOT NULL,
     mime_type TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now', '+7 hours'))
   );
 
   CREATE TABLE IF NOT EXISTS anydesk_stores (
@@ -75,8 +75,8 @@ db.exec(`
     problem TEXT,
     solution TEXT NOT NULL,
     tags TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now', '+7 hours')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now', '+7 hours'))
   );
 
   CREATE TABLE IF NOT EXISTS app_state (
