@@ -30,6 +30,9 @@
         <button class="tab-btn" data-tab="summary">
           <span class="nav-icon">📅</span> สรุปรายวัน
         </button>
+        <button class="tab-btn" data-tab="branch-summary">
+          <span class="nav-icon">🏬</span> สรุปตามสาขา
+        </button>
         <button class="tab-btn" data-tab="anydesk">
           <span class="nav-icon">🖥️</span> AnyDesk
         </button>
@@ -158,6 +161,19 @@
           <button id="load-summary">ดูสรุป</button>
         </div>
         <div id="summary-result"></div>
+      </div>
+
+      <div id="tab-branch-summary" class="tab-panel">
+        <div class="page-header">
+          <h1>สรุปตามสาขา</h1>
+          <p class="subtitle">สรุป ticket ที่มีความเคลื่อนไหวของแต่ละบริษัท/สาขา แยกเป็นข้อความพร้อมคัดลอกทีละสาขา</p>
+        </div>
+        <div class="card summary-header">
+          <label for="branch-summary-date">วันที่:</label>
+          <input type="date" id="branch-summary-date" />
+          <button id="load-branch-summary">ดูสรุป</button>
+        </div>
+        <div id="branch-summary-result"></div>
       </div>
 
       <div id="tab-import" class="tab-panel">

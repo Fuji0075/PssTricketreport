@@ -212,6 +212,20 @@ summaryDateInput.value = new Date().toISOString().slice(0, 10);
 
 const THAI_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 
+function ticketTime(createdAt) {
+  return String(createdAt || '').slice(11, 16);
+}
+
+// One line of ticket metadata shown right under the title: when it was
+// opened and, if available, the weather snapshot captured at that time.
+function ticketMetaLine(t) {
+  const parts = [];
+  const time = ticketTime(t.created_at);
+  if (time) parts.push(`🕐 เปิดเมื่อ ${time} น.`);
+  if (t.weather_snapshot) parts.push(`🌤️ ${t.weather_snapshot}`);
+  return parts.join(' · ');
+}
+
 function buildDailySummaryText(data) {
   const d = new Date(`${data.date}T00:00:00`);
   const beYear = (d.getFullYear() + 543) % 100;
@@ -227,6 +241,8 @@ function buildDailySummaryText(data) {
   const lines = [header, ''];
   tickets.forEach((t, i) => {
     lines.push(`${i + 1}. ${t.title}`);
+    const metaLine = ticketMetaLine(t);
+    if (metaLine) lines.push(metaLine);
     const noteLines = notesByTicket[t.id];
     if (noteLines && noteLines.length) {
       noteLines.forEach((n) => lines.push(`- ${n}`));
@@ -346,6 +362,71 @@ async function loadSummary() {
 }
 
 document.getElementById('load-summary').addEventListener('click', loadSummary);
+
+// ---- Branch summary (per company/site, same data as Daily Summary grouped by company) ----
+const branchSummaryDateInput = document.getElementById('branch-summary-date');
+branchSummaryDateInput.value = new Date().toISOString().slice(0, 10);
+
+async function loadBranchSummary() {
+  const date = branchSummaryDateInput.value;
+  const res = await fetch(`/api/summary/daily?date=${date}`);
+  const data = await res.json();
+  const el = document.getElementById('branch-summary-result');
+
+  const groups = {};
+  (data.touchedTickets || []).forEach((t) => {
+    const key = (t.company || '').trim() || 'ไม่ระบุบริษัท/สาขา';
+    (groups[key] = groups[key] || []).push(t);
+  });
+
+  const branchNames = Object.keys(groups).sort((a, b) => a.localeCompare(b, 'th'));
+
+  if (branchNames.length === 0) {
+    el.innerHTML = '<div class="card"><div class="empty">ไม่มี ticket ที่มีความเคลื่อนไหววันนี้</div></div>';
+    return;
+  }
+
+  el.innerHTML = branchNames.map((name, idx) => {
+    const branchTickets = groups[name];
+    const branchTicketIds = new Set(branchTickets.map((t) => t.id));
+    const branchNotes = (data.notes || []).filter((n) => branchTicketIds.has(n.ticket_id));
+    const branchText = buildDailySummaryText({ date: data.date, touchedTickets: branchTickets, notes: branchNotes });
+    const statusCounts = {};
+    branchTickets.forEach((t) => { statusCounts[t.status] = (statusCounts[t.status] || 0) + 1; });
+
+    return `
+      <div class="card">
+        <h3>🏬 ${escapeHtml(name)} <span class="hint">(${branchTickets.length} ticket)</span></h3>
+        <p>
+          <span class="badge open">Open</span> ${statusCounts.open || 0}
+          <span class="badge in-progress">In Progress</span> ${statusCounts['in-progress'] || 0}
+          <span class="badge on-hold">On Hold</span> ${statusCounts['on-hold'] || 0}
+          <span class="badge done">Done</span> ${statusCounts.done || 0}
+        </p>
+        <textarea readonly class="summary-text-output branch-summary-text" data-branch-idx="${idx}">${escapeHtml(branchText)}</textarea>
+        <div class="form-row" style="margin-top:8px;">
+          <button type="button" class="copy-branch-summary-btn" data-branch-idx="${idx}">คัดลอกข้อความ</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  el.querySelectorAll('.copy-branch-summary-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const textarea = el.querySelector(`.branch-summary-text[data-branch-idx="${btn.dataset.branchIdx}"]`);
+      navigator.clipboard.writeText(textarea.value).then(() => {
+        const original = btn.textContent;
+        btn.textContent = '✓ คัดลอกแล้ว';
+        setTimeout(() => { btn.textContent = original; }, 1500);
+      }).catch(() => {
+        textarea.select();
+        document.execCommand('copy');
+      });
+    });
+  });
+}
+
+document.getElementById('load-branch-summary').addEventListener('click', loadBranchSummary);
 
 // ---- Import ----
 document.getElementById('import-btn').addEventListener('click', async () => {
