@@ -7,7 +7,7 @@ const anydeskRouter = require('./routes/anydesk');
 const kbRouter = require('./routes/kb');
 const lineRouter = require('./routes/line');
 const discordRouter = require('./routes/discord');
-const { sendDiscordMessage } = require('./lib/discord');
+const { isDailySummaryConfigured, sendDailySummaryMessage } = require('./lib/discord');
 const { buildDailySummaryText } = require('./lib/dailySummaryText');
 const { getDailySummaryData, todayStr } = require('./routes/summary');
 
@@ -45,7 +45,7 @@ const DAILY_SUMMARY_TIME = process.env.DISCORD_DAILY_SUMMARY_TIME || '18:00';
 const LAST_SENT_KEY = 'discord_last_daily_summary_date';
 
 async function checkAndSendScheduledSummary() {
-  if (!process.env.DISCORD_WEBHOOK_URL) return;
+  if (!isDailySummaryConfigured()) return;
   const [targetHour, targetMinute] = DAILY_SUMMARY_TIME.split(':').map(Number);
   if (!Number.isFinite(targetHour) || !Number.isFinite(targetMinute)) return;
 
@@ -57,7 +57,7 @@ async function checkAndSendScheduledSummary() {
 
   const data = getDailySummaryData(today);
   const text = buildDailySummaryText(data);
-  const ok = await sendDiscordMessage(`📋 สรุปงานประจำวัน\n\n${text}`);
+  const ok = await sendDailySummaryMessage(`📋 สรุปงานประจำวัน\n\n${text}`);
   if (ok) db.setAppState(LAST_SENT_KEY, today);
 }
 

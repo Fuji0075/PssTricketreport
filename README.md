@@ -79,7 +79,7 @@ title,description,assignee,company,status,priority
 | DELETE | `/api/kb/:id` | ลบบทความ |
 | POST | `/api/kb/recommend` | หาคำแนะนำจาก `title`/`description` — จับคู่คำกับ Knowledge Base และเรียก Claude API (ถ้าตั้งค่า `ANTHROPIC_API_KEY`) เพื่อสรุปคำแนะนำ |
 | POST | `/webhook/line` | Webhook รับข้อความจาก LINE Messaging API (ดูวิธีตั้งค่าด้านล่าง) |
-| GET | `/api/discord/status` | เช็คว่าตั้งค่า `DISCORD_WEBHOOK_URL` ไว้หรือยัง (ให้ frontend โชว์/ซ่อนปุ่ม "ส่งไป Discord") |
+| GET | `/api/discord/status` | เช็คว่าตั้งค่า webhook สำหรับสรุปงานประจำวันไว้หรือยัง (ให้ frontend โชว์/ซ่อนปุ่ม "ส่งไป Discord") |
 | POST | `/api/discord/send` | ส่งสรุปงานประจำวัน (`date` ไม่ระบุ = วันนี้) เข้า Discord ทันที |
 
 ### เปิดใช้สร้าง ticket จากกลุ่ม LINE (ไม่บังคับ)
@@ -145,27 +145,42 @@ npm start
 
 ### เปิดใช้แจ้งเตือนลง Discord (ไม่บังคับ)
 
-**1. สร้าง Webhook ใน Discord**
+รองรับแยกช่อง Discord กันได้ — เช่น ช่อง `#newtickets` รับแจ้งเตือน ticket ใหม่ และช่อง `#daily-summary` รับสรุปงานประจำวัน แยกกันคนละ Webhook
+
+**1. สร้าง Webhook ใน Discord (ทำซ้ำ 2 รอบ ถ้าจะแยกช่อง)**
 - เปิด **การตั้งค่าช่อง (Edit Channel)** ของช่องที่ต้องการรับแจ้งเตือน → แท็บ **Integrations** → **Webhooks** → **New Webhook**
 - ตั้งชื่อ (เช่น "Ticket Bot") แล้วกด **Copy Webhook URL**
+- ทำซ้ำอีกครั้งกับอีกช่องหนึ่ง ถ้าต้องการแยก ticket ใหม่ กับ สรุปประจำวัน คนละช่อง
 
 **2. ตั้งค่า environment variable แล้วรันเซิร์ฟเวอร์**
+
+ถ้าจะแยกช่องกัน:
 ```bash
 # Windows (Command Prompt)
-set DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/xxxxx/yyyyy
+set DISCORD_NEW_TICKET_WEBHOOK_URL=https://discord.com/api/webhooks/xxxxx/yyyyy
+set DISCORD_DAILY_SUMMARY_WEBHOOK_URL=https://discord.com/api/webhooks/aaaaa/bbbbb
 set DISCORD_DAILY_SUMMARY_TIME=18:00
 npm start
 
 # Windows (PowerShell)
-$env:DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/xxxxx/yyyyy"
+$env:DISCORD_NEW_TICKET_WEBHOOK_URL="https://discord.com/api/webhooks/xxxxx/yyyyy"
+$env:DISCORD_DAILY_SUMMARY_WEBHOOK_URL="https://discord.com/api/webhooks/aaaaa/bbbbb"
 $env:DISCORD_DAILY_SUMMARY_TIME="18:00"
 npm start
 ```
 
-- `DISCORD_WEBHOOK_URL`: **จำเป็นต้องตั้ง** ถ้าอยากใช้ฟีเจอร์นี้ ถ้าไม่ตั้งไว้ ระบบจะไม่ส่งอะไรเข้า Discord เลย (ฟีเจอร์อื่นทำงานปกติ) และปุ่ม "ส่งไป Discord" จะไม่แสดงในหน้าเว็บ
+ถ้าจะใช้ช่องเดียวสำหรับทั้งสองอย่าง ตั้งแค่ `DISCORD_WEBHOOK_URL` ตัวเดียวพอ:
+```bash
+set DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/xxxxx/yyyyy
+npm start
+```
+
+- `DISCORD_NEW_TICKET_WEBHOOK_URL`: webhook สำหรับแจ้งเตือน ticket ใหม่ ถ้าไม่ตั้งจะ fallback ไปใช้ `DISCORD_WEBHOOK_URL`
+- `DISCORD_DAILY_SUMMARY_WEBHOOK_URL`: webhook สำหรับสรุปงานประจำวัน ถ้าไม่ตั้งจะ fallback ไปใช้ `DISCORD_WEBHOOK_URL`
+- `DISCORD_WEBHOOK_URL`: webhook ตัวกลาง ใช้เมื่อไม่ได้แยก webhook ของสองอย่างข้างบนไว้ — ถ้าไม่ตั้งค่าอะไรเลยสักตัว ระบบจะไม่ส่งอะไรเข้า Discord เลย (ฟีเจอร์อื่นทำงานปกติ) และปุ่ม "ส่งไป Discord" จะไม่แสดงในหน้าเว็บ
 - `DISCORD_DAILY_SUMMARY_TIME`: เวลาที่จะส่งสรุปงานประจำวันอัตโนมัติ รูปแบบ 24 ชั่วโมง `HH:MM` (ไม่ระบุ = ค่าเริ่มต้น `18:00`) ระบบเช็คทุก 1 นาที เมื่อถึงเวลาที่ตั้งไว้และยังไม่เคยส่งของวันนั้นจะส่งให้อัตโนมัติ 1 ครั้ง ต่อให้รีสตาร์ทเซิร์ฟเวอร์ก็จะไม่ส่งซ้ำ (จำวันที่ส่งล่าสุดไว้ในฐานข้อมูล)
 
 **3. ใช้งาน**
-- ทุกครั้งที่มี ticket ใหม่ (จากเว็บหรือจากกลุ่ม LINE) จะมีข้อความแจ้งเตือนเข้า Discord ทันทีอัตโนมัติ
-- ทุกวันเวลาที่ตั้งไว้จะมีสรุปงานประจำวันส่งเข้า Discord อัตโนมัติ (ข้อความเดียวกับที่โชว์ในกล่อง "📋 สรุปสำหรับแจ้งในไลน์")
-- ถ้าอยากส่งสรุปตอนนี้เลยไม่ต้องรอถึงเวลา กดปุ่ม **"ส่งไป Discord"** ในหน้าสรุปรายวันได้ทุกเมื่อ (ปุ่มนี้จะแสดงก็ต่อเมื่อตั้งค่า `DISCORD_WEBHOOK_URL` ไว้แล้ว)
+- ทุกครั้งที่มี ticket ใหม่ (จากเว็บหรือจากกลุ่ม LINE) จะมีข้อความแจ้งเตือนเข้าช่อง Discord ที่ตั้งไว้สำหรับ ticket ใหม่ทันทีอัตโนมัติ
+- ทุกวันเวลาที่ตั้งไว้จะมีสรุปงานประจำวันส่งเข้าช่อง Discord ที่ตั้งไว้สำหรับสรุปงานอัตโนมัติ (ข้อความเดียวกับที่โชว์ในกล่อง "📋 สรุปสำหรับแจ้งในไลน์")
+- ถ้าอยากส่งสรุปตอนนี้เลยไม่ต้องรอถึงเวลา กดปุ่ม **"ส่งไป Discord"** ในหน้าสรุปรายวันได้ทุกเมื่อ (ปุ่มนี้จะแสดงก็ต่อเมื่อตั้งค่า webhook สำหรับสรุปงานไว้แล้ว)

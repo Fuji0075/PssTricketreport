@@ -2,7 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const db = require('../db');
 const { weatherSnapshotForCompany } = require('../lib/weather');
-const { sendDiscordMessage, buildNewTicketMessage } = require('../lib/discord');
+const { sendNewTicketMessage, buildNewTicketMessage } = require('../lib/discord');
 
 const router = express.Router();
 
@@ -95,7 +95,7 @@ async function createTicketFromLine({ title, description, company, reporterNote 
     db.prepare('UPDATE tickets SET weather_snapshot = ? WHERE id = ?').run(weatherSnapshot, ticketId);
   }
   const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
-  sendDiscordMessage(buildNewTicketMessage(ticket)).catch(() => {});
+  sendNewTicketMessage(buildNewTicketMessage(ticket)).catch(() => {});
   return ticket;
 }
 
