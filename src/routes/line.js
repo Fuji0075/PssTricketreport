@@ -4,6 +4,7 @@ const db = require('../db');
 const { weatherSnapshotForCompany } = require('../lib/weather');
 const { sendNewTicketMessage, buildNewTicketMessage } = require('../lib/discord');
 const { nowThaiString } = require('../lib/thaiTime');
+const { formatTicketTitle } = require('../lib/ticketTitle');
 
 const router = express.Router();
 
@@ -82,12 +83,13 @@ function extractTicketText(message) {
 
 async function createTicketFromLine({ title, description, company, reporterNote }) {
   const now = nowThaiString();
+  const formattedTitle = formatTicketTitle(company, title);
   const result = db
     .prepare(
       `INSERT INTO tickets (title, description, assignee, company, status, priority, created_at, updated_at)
        VALUES (?, ?, '', ?, 'open', 'medium', ?, ?)`
     )
-    .run(title, description, company || '', now, now);
+    .run(formattedTitle, description, company || '', now, now);
   const ticketId = result.lastInsertRowid;
   if (reporterNote) {
     db.prepare('INSERT INTO ticket_notes (ticket_id, note, created_at) VALUES (?, ?, ?)').run(ticketId, reporterNote, now);
@@ -145,7 +147,7 @@ router.post('/line', async (req, res) => {
         reporterNote,
       });
 
-      await replyText(event.replyToken, `รับเรื่องแล้วครับ ✅ Ticket #${ticket.id}: ${title}`);
+      await replyText(event.replyToken, `รับเรื่องแล้วครับ ✅ Ticket #${ticket.id}: ${ticket.title}`);
     } catch (err) {
       console.error('Failed to process LINE event', err);
     }

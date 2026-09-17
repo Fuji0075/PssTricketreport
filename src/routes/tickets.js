@@ -7,6 +7,7 @@ const db = require('../db');
 const { weatherSnapshotForCompany } = require('../lib/weather');
 const { sendNewTicketMessage, buildNewTicketMessage } = require('../lib/discord');
 const { nowThaiString } = require('../lib/thaiTime');
+const { formatTicketTitle } = require('../lib/ticketTitle');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -104,10 +105,11 @@ router.post('/', async (req, res) => {
 
   const effectiveCreatedAt = createdAt || nowThaiString();
   const resolvedAt = status === 'done' ? nowThaiString() : null;
+  const formattedTitle = formatTicketTitle(company, title);
   const result = db.prepare(
     `INSERT INTO tickets (title, description, assignee, company, status, priority, resolved_at, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(title.trim(), description, assignee, company, status, priority, resolvedAt, effectiveCreatedAt, effectiveCreatedAt);
+  ).run(formattedTitle, description, assignee, company, status, priority, resolvedAt, effectiveCreatedAt, effectiveCreatedAt);
 
   // Best-effort weather snapshot for the branch at the ticket's date (the
   // chosen created_at, or now); a slow/failed lookup never blocks ticket
