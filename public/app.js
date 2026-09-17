@@ -941,7 +941,11 @@ async function openTicketModal(id) {
             <div class="activity-item">
               <div class="activity-avatar">🎫</div>
               <div class="activity-content">
-                <div class="activity-meta"><strong>คุณ</strong> · <span class="activity-time">${formatDateTime(n.created_at)}</span></div>
+                <div class="activity-meta">
+                  <strong>คุณ</strong> · <span class="activity-time">${formatDateTime(n.created_at)}</span>
+                  <button type="button" class="activity-note-edit" data-note-id="${n.id}" title="แก้ไข">✎</button>
+                  <button type="button" class="activity-note-delete" data-note-id="${n.id}" title="ลบ">×</button>
+                </div>
                 <div class="activity-text">${escapeHtml(n.note)}</div>
               </div>
             </div>
@@ -1027,6 +1031,34 @@ async function openTicketModal(id) {
   document.getElementById('modal-add-note-btn').onclick = addNote;
   document.getElementById('modal-note-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); addNote(); }
+  });
+
+  modalBody.querySelectorAll('.activity-note-edit').forEach((btn) => {
+    btn.onclick = async () => {
+      const existingNote = (t.notes || []).find((n) => String(n.id) === btn.dataset.noteId);
+      const updated = prompt('แก้ไขข้อความ:', existingNote ? existingNote.note : '');
+      if (updated === null || !updated.trim()) return;
+      const r = await fetch(`/api/tickets/${t.id}/notes/${btn.dataset.noteId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: updated.trim() }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        alert(err.error || 'เกิดข้อผิดพลาด');
+        return;
+      }
+      openTicketModal(t.id);
+    };
+  });
+
+  modalBody.querySelectorAll('.activity-note-delete').forEach((btn) => {
+    btn.onclick = async () => {
+      if (!confirm('ยืนยันลบข้อความนี้?')) return;
+      await fetch(`/api/tickets/${t.id}/notes/${btn.dataset.noteId}`, { method: 'DELETE' });
+      openTicketModal(t.id);
+      refreshAll();
+    };
   });
 }
 

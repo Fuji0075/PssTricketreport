@@ -443,9 +443,14 @@ button.secondary:hover { background: var(--bg); border-color: var(--primary); co
   display: flex; align-items: center; justify-content: center; font-size: 0.85rem; flex-shrink: 0;
 }
 .activity-content { flex: 1; min-width: 0; }
-.activity-meta { font-size: 0.78rem; margin-bottom: 3px; }
+.activity-meta { font-size: 0.78rem; margin-bottom: 3px; display: flex; align-items: center; gap: 6px; }
 .activity-meta strong { font-weight: 700; }
 .activity-time { color: var(--muted); }
+.activity-note-edit, .activity-note-delete {
+  border: none; background: none; color: var(--muted); cursor: pointer; padding: 0 2px;
+  font-size: 0.85rem; line-height: 1; opacity: 0.6;
+}
+.activity-note-edit:hover, .activity-note-delete:hover { opacity: 1; color: var(--fg); }
 .activity-text {
   font-size: 0.85rem; background: var(--card); border: 1px solid var(--border);
   border-radius: 10px 10px 10px 3px; padding: 8px 12px; white-space: pre-wrap; word-break: break-word;

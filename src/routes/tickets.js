@@ -227,6 +227,26 @@ router.post('/:id/notes', (req, res) => {
   res.status(201).json(created);
 });
 
+router.put('/:id/notes/:noteId', (req, res) => {
+  const existing = db
+    .prepare('SELECT * FROM ticket_notes WHERE id = ? AND ticket_id = ?')
+    .get(req.params.noteId, req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Note not found' });
+  const { note } = req.body;
+  if (!note || !note.trim()) return res.status(400).json({ error: 'note is required' });
+  db.prepare('UPDATE ticket_notes SET note = ? WHERE id = ?').run(note.trim(), req.params.noteId);
+  const updated = db.prepare('SELECT * FROM ticket_notes WHERE id = ?').get(req.params.noteId);
+  res.json(updated);
+});
+
+router.delete('/:id/notes/:noteId', (req, res) => {
+  const result = db
+    .prepare('DELETE FROM ticket_notes WHERE id = ? AND ticket_id = ?')
+    .run(req.params.noteId, req.params.id);
+  if (result.changes === 0) return res.status(404).json({ error: 'Note not found' });
+  res.status(204).end();
+});
+
 function parseCsv(text) {
   const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
   if (lines.length === 0) return [];
