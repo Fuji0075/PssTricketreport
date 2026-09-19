@@ -520,6 +520,10 @@ function buildKeywordAnalysisText(data, keywords) {
 
   data.keywordBreakdown.forEach((kw) => {
     lines.push(`คีย์เวิร์ด "${kw.keyword}" — พบ ${kw.count} เคส (แก้ไขแล้ว ${kw.fixedCount}, ยังไม่แก้ ${kw.unresolvedCount})`);
+    if (kw.topSolutions && kw.topSolutions.length) {
+      lines.push('  วิธีแก้ที่พบบ่อย:');
+      kw.topSolutions.forEach((s) => lines.push(`  - (${s.count} ครั้ง) ${s.solution}`));
+    }
     kw.tickets.forEach((t) => {
       lines.push(`  - #${t.id} ${t.title} [${statusLabel[t.status] || t.status}]`);
     });
@@ -566,15 +570,27 @@ async function loadKeywordAnalysis() {
             <span class="badge done">แก้ไขแล้ว ${kw.fixedCount}</span>
             <span class="badge open">ยังไม่แก้ ${kw.unresolvedCount}</span>
           </p>
+          ${kw.topSolutions && kw.topSolutions.length ? `
+            <div class="top-solutions">
+              <p class="hint" style="margin:6px 0 2px;">💡 วิธีแก้ที่พบบ่อย (จากช่องรายละเอียดและบันทึกในช่องคอมเมนต์):</p>
+              <ul class="keyword-ticket-list">
+                ${kw.topSolutions.map((s) => `<li><strong>${s.count} ครั้ง</strong> — ${escapeHtml(s.solution)}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
           ${kw.tickets.length ? `
             <ul class="keyword-ticket-list">
-              ${kw.tickets.map((t) => `
+              ${kw.tickets.map((t) => {
+                const solutionTexts = [...(t.notes || []), t.description].filter((s) => s && s.trim());
+                return `
                 <li>
                   <span class="badge ${t.status}">${statusLabel[t.status] || t.status}</span>
                   #${t.id} ${escapeHtml(t.title)}${t.company ? ` · ${escapeHtml(t.company)}` : ''}
                   · ${escapeHtml(formatThaiDate(t.created_at))}
+                  ${solutionTexts.length ? `<br><span class="hint">↳ ${solutionTexts.map((n) => escapeHtml(n)).join(' / ')}</span>` : ''}
                 </li>
-              `).join('')}
+              `;
+              }).join('')}
             </ul>
           ` : '<p class="hint">ไม่พบเคสที่ตรงกับคีย์เวิร์ดนี้</p>'}
         </div>

@@ -114,8 +114,11 @@ router.get('/range', (req, res) => {
 
 // Keyword-driven case analysis over all (or a date-ranged) ticket history:
 // how many cases matched each keyword (e.g. "กระดาษติด", "ไม้กั้นไม่เปิด" —
-// paper jam, barrier gate not opening), and how many of those are fixed
-// (status done) vs still unresolved.
+// paper jam, barrier gate not opening), how many of those are fixed (status
+// done) vs still unresolved, and which resolution note (the comment left in
+// the ticket's Activity thread) recurs most often — since the same keyword
+// issue is frequently solved the same way, this surfaces that pattern
+// instead of making someone read every ticket's comments by hand.
 function getKeywordAnalysis(keywords, fromDate, toDate) {
   let sql = 'SELECT * FROM tickets';
   const clauses = [];
@@ -132,15 +135,45 @@ function getKeywordAnalysis(keywords, fromDate, toDate) {
   sql += ' ORDER BY created_at';
   const tickets = db.prepare(sql).all(...params);
 
+  const ticketIds = tickets.map((t) => t.id);
+  const allNotes = ticketIds.length
+    ? db
+        .prepare(
+          `SELECT * FROM ticket_notes WHERE ticket_id IN (${ticketIds.map(() => '?').join(',')}) ORDER BY created_at`
+        )
+        .all(...ticketIds)
+    : [];
+  const notesByTicket = {};
+  allNotes.forEach((n) => {
+    (notesByTicket[n.ticket_id] = notesByTicket[n.ticket_id] || []).push(n.note);
+  });
+
   const totalCases = tickets.length;
   const fixedCases = tickets.filter((t) => t.status === 'done').length;
   const unresolvedCases = totalCases - fixedCases;
 
   const keywordBreakdown = keywords.map((keyword) => {
     const needle = keyword.trim().toLowerCase();
-    const matches = tickets.filter((t) =>
-      `${t.title} ${t.description || ''}`.toLowerCase().includes(needle)
-    );
+    const matches = tickets.filter((t) => {
+      const notesText = (notesByTicket[t.id] || []).join(' ');
+      return `${t.title} ${t.description || ''} ${notesText}`.toLowerCase().includes(needle);
+    });
+
+    // The fix is sometimes written in the ticket's description field
+    // instead of (or as well as) a comment, so both count as "solution" text.
+    const solutionCounts = new Map();
+    matches.forEach((t) => {
+      const candidates = [...(notesByTicket[t.id] || []), t.description];
+      candidates.forEach((text) => {
+        const normalized = String(text || '').trim().replace(/\s+/g, ' ');
+        if (!normalized) return;
+        solutionCounts.set(normalized, (solutionCounts.get(normalized) || 0) + 1);
+      });
+    });
+    const topSolutions = [...solutionCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([solution, count]) => ({ solution, count }));
+
     return {
       keyword,
       count: matches.length,
@@ -148,7 +181,10 @@ function getKeywordAnalysis(keywords, fromDate, toDate) {
       unresolvedCount: matches.filter((t) => t.status !== 'done').length,
       tickets: matches.map((t) => ({
         id: t.id, title: t.title, status: t.status, company: t.company, created_at: t.created_at,
+        description: t.description || '',
+        notes: notesByTicket[t.id] || [],
       })),
+      topSolutions,
     };
   });
 
