@@ -518,6 +518,18 @@ function buildKeywordAnalysisText(data, keywords) {
     '',
   ];
 
+  (data.branchBreakdown || []).forEach((b) => {
+    lines.push(`${b.company} — ${b.totalCases} เคส (แก้ไขแล้ว ${b.fixedCases}, ยังไม่แก้ ${b.unresolvedCases}, เป็นซ้ำ ${b.recurringCases})`);
+    b.keywords.forEach((k) => {
+      lines.push(`  ${b.company} = ${k.keyword} = ${k.count} ครั้ง${k.recurring ? ' (เป็นซ้ำบ่อย)' : ''} — แก้ไขแล้ว ${k.fixedCount}, ยังไม่แก้ ${k.unresolvedCount}`);
+      lines.push(`    เคส: ${k.tickets.map((t) => `#${t.id} ${t.title}`).join(', ')}`);
+    });
+    lines.push('');
+  });
+
+  lines.push('--- สรุปตามคีย์เวิร์ด (ทุกสาขารวมกัน) ---');
+  lines.push('');
+
   data.keywordBreakdown.forEach((kw) => {
     lines.push(`คีย์เวิร์ด "${kw.keyword}" — พบ ${kw.count} เคส (แก้ไขแล้ว ${kw.fixedCount}, ยังไม่แก้ ${kw.unresolvedCount})`);
     if (kw.topSolutions && kw.topSolutions.length) {
@@ -562,6 +574,28 @@ async function loadKeywordAnalysis() {
       <div class="stat"><span class="num">${data.fixedCases}</span><span class="label">แก้ไขแล้ว</span></div>
       <div class="stat"><span class="num">${data.unresolvedCases}</span><span class="label">ยังแก้ไม่ได้</span></div>
     </div>
+    <div class="card branch-report-card">
+      <h3>🏬 สรุปตามสาขา</h3>
+      ${data.branchBreakdown.map((b) => `
+        <div class="keyword-breakdown-item">
+          <p><strong>${escapeHtml(b.company)}</strong> — ${b.totalCases} เคส
+            <span class="badge done">แก้ไขแล้ว ${b.fixedCases}</span>
+            <span class="badge open">ยังไม่แก้ ${b.unresolvedCases}</span>
+            ${b.recurringCases > 0 ? `<span class="badge on-hold">เป็นซ้ำ ${b.recurringCases}</span>` : ''}
+          </p>
+          <ul class="keyword-ticket-list">
+            ${b.keywords.map((k) => `
+              <li>
+                ${escapeHtml(b.company)} = ${escapeHtml(k.keyword)} = ${k.count} ครั้ง${k.recurring ? ' 🔁 เป็นซ้ำบ่อย' : ''}
+                (แก้ไขแล้ว ${k.fixedCount}, ยังไม่แก้ ${k.unresolvedCount})
+                <br><span class="hint">↳ ${k.tickets.map((t) => `#${t.id} ${escapeHtml(t.title)}`).join(', ')}</span>
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+      `).join('') || '<div class="empty">ไม่มีเคสที่ตรงกับคีย์เวิร์ดที่ระบุ</div>'}
+    </div>
+
     <div class="card branch-report-card">
       <h3>📊 สรุปตามคีย์เวิร์ด</h3>
       ${data.keywordBreakdown.map((kw) => `

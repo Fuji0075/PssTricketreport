@@ -188,6 +188,50 @@ function getKeywordAnalysis(keywords, fromDate, toDate) {
     };
   });
 
+  // Branch-first view of the same matches — "โรบินสัน สมุทรปราการ =
+  // กระดาษติด = 5 ครั้ง" — a keyword that recurs (>=2 times) at a branch is
+  // flagged so a repeat hardware problem at one site is easy to spot.
+  const branchMap = new Map();
+  keywordBreakdown.forEach((kw) => {
+    kw.tickets.forEach((t) => {
+      const company = (t.company || '').trim() || 'ไม่ระบุบริษัท/สาขา';
+      if (!branchMap.has(company)) branchMap.set(company, new Map());
+      const kwMap = branchMap.get(company);
+      if (!kwMap.has(kw.keyword)) kwMap.set(kw.keyword, []);
+      kwMap.get(kw.keyword).push(t);
+    });
+  });
+
+  const branchBreakdown = [...branchMap.entries()]
+    .map(([company, kwMap]) => {
+      const keywordCounts = [...kwMap.entries()]
+        .map(([keyword, ticketList]) => ({
+          keyword,
+          count: ticketList.length,
+          fixedCount: ticketList.filter((t) => t.status === 'done').length,
+          unresolvedCount: ticketList.filter((t) => t.status !== 'done').length,
+          recurring: ticketList.length >= 2,
+          tickets: ticketList.map((t) => ({ id: t.id, title: t.title, status: t.status })),
+        }))
+        .sort((a, b) => b.count - a.count);
+
+      // Dedupe tickets that match more than one keyword before totaling.
+      const uniqueTickets = [...new Map(
+        [...kwMap.values()].flat().map((t) => [t.id, t])
+      ).values()];
+      const recurringKeywords = keywordCounts.filter((k) => k.recurring);
+
+      return {
+        company,
+        totalCases: uniqueTickets.length,
+        fixedCases: uniqueTickets.filter((t) => t.status === 'done').length,
+        unresolvedCases: uniqueTickets.filter((t) => t.status !== 'done').length,
+        recurringCases: recurringKeywords.reduce((sum, k) => sum + k.count, 0),
+        keywords: keywordCounts,
+      };
+    })
+    .sort((a, b) => b.totalCases - a.totalCases);
+
   return {
     from: fromDate || null,
     to: toDate || null,
@@ -195,6 +239,7 @@ function getKeywordAnalysis(keywords, fromDate, toDate) {
     fixedCases,
     unresolvedCases,
     keywordBreakdown,
+    branchBreakdown,
   };
 }
 
