@@ -218,6 +218,19 @@ summaryDateInput.value = todayThaiDateStr();
 
 const THAI_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 
+// "YYYY-MM-DD" -> "17 ก.ย. 69" (Buddhist year, 2 digits)
+function formatThaiDate(dateStr) {
+  const d = new Date(`${String(dateStr).slice(0, 10)}T00:00:00`);
+  const beYear = (d.getFullYear() + 543) % 100;
+  return `${d.getDate()} ${THAI_MONTHS_SHORT[d.getMonth()]} ${beYear}`;
+}
+
+// "YYYY-MM-DD HH:MM:SS" -> "17 ก.ย. 69 09:15 น."
+function formatThaiDateTime(str) {
+  const s = String(str || '');
+  return `${formatThaiDate(s)} ${s.slice(11, 16)} น.`;
+}
+
 function ticketTime(createdAt) {
   return String(createdAt || '').slice(11, 16);
 }
@@ -369,18 +382,71 @@ async function loadSummary() {
 
 document.getElementById('load-summary').addEventListener('click', loadSummary);
 
-// ---- Branch summary (per company/site, same data as Daily Summary grouped by company) ----
-const branchSummaryDateInput = document.getElementById('branch-summary-date');
-branchSummaryDateInput.value = todayThaiDateStr();
+// ---- Branch summary (per-branch problem history over a date range, with
+// copy + print for reporting) ----
+const branchSummaryFromInput = document.getElementById('branch-summary-from');
+const branchSummaryToInput = document.getElementById('branch-summary-to');
+const branchSummaryCompanyInput = document.getElementById('branch-summary-company');
+
+branchSummaryToInput.value = todayThaiDateStr();
+{
+  const weekAgo = new Date(`${todayThaiDateStr()}T00:00:00`);
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  branchSummaryFromInput.value = `${weekAgo.getFullYear()}-${String(weekAgo.getMonth() + 1).padStart(2, '0')}-${String(weekAgo.getDate()).padStart(2, '0')}`;
+}
+
+// One ticket's line in a branch report: full date+time (a range can span
+// many days, so just the time-of-day isn't enough here), weather, status,
+// then its resolution notes (or description if never noted).
+function buildRangeTicketBlock(t, notesByTicket) {
+  const lines = [`${t.title} (#${t.id})`];
+  const metaParts = [`📅 ${formatThaiDateTime(t.created_at)}`];
+  if (t.weather_snapshot) metaParts.push(`🌤️ ${t.weather_snapshot}`);
+  metaParts.push(`สถานะ: ${statusLabel[t.status] || t.status}`);
+  lines.push(metaParts.join(' · '));
+  const noteLines = notesByTicket[t.id];
+  if (noteLines && noteLines.length) {
+    noteLines.forEach((n) => lines.push(`- ${n}`));
+  } else if (t.description) {
+    lines.push(`- ${t.description}`);
+  }
+  return lines.join('\n');
+}
+
+function buildRangeReportText(branchName, fromDate, toDate, tickets, notesByTicket) {
+  const header = `รายงานสรุปปัญหา: ${branchName}`;
+  const rangeLine = `ช่วงวันที่ ${formatThaiDate(fromDate)} - ${formatThaiDate(toDate)}`;
+  const lines = [header, rangeLine, ''];
+  tickets.forEach((t, i) => {
+    lines.push(`${i + 1}. ${buildRangeTicketBlock(t, notesByTicket)}`);
+    lines.push('');
+  });
+  if (tickets.length === 0) lines.push('(ไม่มี ticket ในช่วงวันที่นี้)');
+  return lines.join('\n').trim();
+}
 
 async function loadBranchSummary() {
-  const date = branchSummaryDateInput.value;
-  const res = await fetch(`/api/summary/daily?date=${date}`);
-  const data = await res.json();
+  const from = branchSummaryFromInput.value;
+  const to = branchSummaryToInput.value;
+  const company = branchSummaryCompanyInput.value.trim();
   const el = document.getElementById('branch-summary-result');
+  if (!from || !to) {
+    el.innerHTML = '<div class="card"><div class="empty">กรุณาเลือกช่วงวันที่</div></div>';
+    return;
+  }
+
+  const params = new URLSearchParams({ from, to });
+  if (company) params.set('company', company);
+  const res = await fetch(`/api/summary/range?${params.toString()}`);
+  const data = await res.json();
+
+  const notesByTicket = {};
+  (data.notes || []).forEach((n) => {
+    (notesByTicket[n.ticket_id] = notesByTicket[n.ticket_id] || []).push(n.note);
+  });
 
   const groups = {};
-  (data.touchedTickets || []).forEach((t) => {
+  (data.tickets || []).forEach((t) => {
     const key = (t.company || '').trim() || 'ไม่ระบุบริษัท/สาขา';
     (groups[key] = groups[key] || []).push(t);
   });
@@ -388,29 +454,28 @@ async function loadBranchSummary() {
   const branchNames = Object.keys(groups).sort((a, b) => a.localeCompare(b, 'th'));
 
   if (branchNames.length === 0) {
-    el.innerHTML = '<div class="card"><div class="empty">ไม่มี ticket ที่มีความเคลื่อนไหววันนี้</div></div>';
+    el.innerHTML = '<div class="card"><div class="empty">ไม่มี ticket ในช่วงวันที่ที่เลือก</div></div>';
     return;
   }
 
   el.innerHTML = branchNames.map((name, idx) => {
     const branchTickets = groups[name];
-    const branchTicketIds = new Set(branchTickets.map((t) => t.id));
-    const branchNotes = (data.notes || []).filter((n) => branchTicketIds.has(n.ticket_id));
-    const branchText = buildDailySummaryText({ date: data.date, touchedTickets: branchTickets, notes: branchNotes });
     const statusCounts = {};
     branchTickets.forEach((t) => { statusCounts[t.status] = (statusCounts[t.status] || 0) + 1; });
+    const reportText = buildRangeReportText(name, from, to, branchTickets, notesByTicket);
 
     return `
-      <div class="card">
+      <div class="card branch-report-card">
         <h3>🏬 ${escapeHtml(name)} <span class="hint">(${branchTickets.length} ticket)</span></h3>
+        <p class="hint">ช่วงวันที่ ${escapeHtml(formatThaiDate(from))} - ${escapeHtml(formatThaiDate(to))}</p>
         <p>
           <span class="badge open">Open</span> ${statusCounts.open || 0}
           <span class="badge in-progress">In Progress</span> ${statusCounts['in-progress'] || 0}
           <span class="badge on-hold">On Hold</span> ${statusCounts['on-hold'] || 0}
           <span class="badge done">Done</span> ${statusCounts.done || 0}
         </p>
-        <textarea readonly class="summary-text-output branch-summary-text" data-branch-idx="${idx}">${escapeHtml(branchText)}</textarea>
-        <div class="form-row" style="margin-top:8px;">
+        <textarea readonly class="summary-text-output branch-summary-text" data-branch-idx="${idx}">${escapeHtml(reportText)}</textarea>
+        <div class="form-row no-print" style="margin-top:8px;">
           <button type="button" class="copy-branch-summary-btn" data-branch-idx="${idx}">คัดลอกข้อความ</button>
         </div>
       </div>
@@ -433,6 +498,8 @@ async function loadBranchSummary() {
 }
 
 document.getElementById('load-branch-summary').addEventListener('click', loadBranchSummary);
+document.getElementById('print-branch-summary-btn').addEventListener('click', () => window.print());
+loadBranchSummary();
 
 // ---- Import ----
 document.getElementById('import-btn').addEventListener('click', async () => {

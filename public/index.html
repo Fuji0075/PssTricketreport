@@ -166,12 +166,17 @@
       <div id="tab-branch-summary" class="tab-panel">
         <div class="page-header">
           <h1>สรุปตามสาขา</h1>
-          <p class="subtitle">สรุป ticket ที่มีความเคลื่อนไหวของแต่ละบริษัท/สาขา แยกเป็นข้อความพร้อมคัดลอกทีละสาขา</p>
+          <p class="subtitle">สรุปปัญหาของแต่ละสาขาย้อนหลังถึงปัจจุบัน คัดลอกหรือพิมพ์รีพอร์ตออกมาได้</p>
         </div>
         <div class="card summary-header">
-          <label for="branch-summary-date">วันที่:</label>
-          <input type="date" id="branch-summary-date" />
+          <label for="branch-summary-from">จากวันที่:</label>
+          <input type="date" id="branch-summary-from" />
+          <label for="branch-summary-to">ถึงวันที่:</label>
+          <input type="date" id="branch-summary-to" />
+          <label for="branch-summary-company">สาขา:</label>
+          <input type="text" id="branch-summary-company" placeholder="ทุกสาขา" list="company-options" style="flex:1; min-width:160px;" />
           <button id="load-branch-summary">ดูสรุป</button>
+          <button type="button" class="secondary" id="print-branch-summary-btn">🖨️ พิมพ์รายงาน</button>
         </div>
         <div id="branch-summary-result"></div>
       </div>

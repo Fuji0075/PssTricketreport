@@ -79,6 +79,39 @@ router.get('/daily', (req, res) => {
   res.json(getDailySummaryData(date, staleDays));
 });
 
+// Ticket history over an arbitrary date range (not just "today"), optionally
+// scoped to one company/branch — backs the "สรุปตามสาขา" report, which needs
+// to look back further than a single day.
+function getRangeSummaryData(fromDate, toDate, company) {
+  let sql = `SELECT * FROM tickets WHERE date(created_at) BETWEEN date(?) AND date(?)`;
+  const params = [fromDate, toDate];
+  if (company) {
+    sql += ' AND company = ?';
+    params.push(company);
+  }
+  sql += ' ORDER BY company, created_at';
+  const tickets = db.prepare(sql).all(...params);
+
+  const ids = tickets.map((t) => t.id);
+  const notes = ids.length
+    ? db
+        .prepare(
+          `SELECT * FROM ticket_notes WHERE ticket_id IN (${ids.map(() => '?').join(',')}) ORDER BY created_at`
+        )
+        .all(...ids)
+    : [];
+
+  return { from: fromDate, to: toDate, company: company || null, tickets, notes };
+}
+
+router.get('/range', (req, res) => {
+  const { from, to, company } = req.query;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from || '') || !/^\d{4}-\d{2}-\d{2}$/.test(to || '')) {
+    return res.status(400).json({ error: 'from and to must be in YYYY-MM-DD format' });
+  }
+  res.json(getRangeSummaryData(from, to, company));
+});
+
 router.get('/pending', (req, res) => {
   const staleDays = Number(req.query.staleDays) || 2;
   const pending = db
@@ -94,4 +127,5 @@ router.get('/pending', (req, res) => {
 
 module.exports = router;
 module.exports.getDailySummaryData = getDailySummaryData;
+module.exports.getRangeSummaryData = getRangeSummaryData;
 module.exports.todayStr = todayStr;

@@ -459,3 +459,11 @@ button.secondary:hover { background: var(--bg); border-color: var(--primary); co
   display: flex; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--border); background: var(--card);
 }
 .activity-input input { flex: 1; }
+
+@media print {
+  .sidebar, .page-header, .summary-header, .alert-banner, .no-print { display: none !important; }
+  .app-shell { display: block; }
+  .main-area { padding: 0; }
+  .branch-report-card { box-shadow: none; border: 1px solid #000; page-break-inside: avoid; margin-bottom: 16px; }
+  .summary-text-output { border: none; padding: 0; background: none; }
+}
