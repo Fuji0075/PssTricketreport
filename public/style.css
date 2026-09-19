@@ -460,6 +460,11 @@ button.secondary:hover { background: var(--bg); border-color: var(--primary); co
 }
 .activity-input input { flex: 1; }
 
+.keyword-breakdown-item { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.keyword-breakdown-item:last-of-type { border-bottom: none; }
+.keyword-ticket-list { margin: 6px 0 0; padding-left: 18px; font-size: 0.85rem; color: var(--muted); }
+.keyword-ticket-list li { margin-bottom: 3px; }
+
 @media print {
   .sidebar, .page-header, .summary-header, .alert-banner, .no-print { display: none !important; }
   .app-shell { display: block; }

@@ -33,6 +33,9 @@
         <button class="tab-btn" data-tab="branch-summary">
           <span class="nav-icon">🏬</span> สรุปตามสาขา
         </button>
+        <button class="tab-btn" data-tab="keyword-analysis">
+          <span class="nav-icon">🔍</span> วิเคราะห์ปัญหาซ้ำ
+        </button>
         <button class="tab-btn" data-tab="anydesk">
           <span class="nav-icon">🖥️</span> AnyDesk
         </button>
@@ -179,6 +182,24 @@
           <button type="button" class="secondary" id="print-branch-summary-btn">🖨️ พิมพ์รายงาน</button>
         </div>
         <div id="branch-summary-result"></div>
+      </div>
+
+      <div id="tab-keyword-analysis" class="tab-panel">
+        <div class="page-header">
+          <h1>วิเคราะห์ปัญหาซ้ำ</h1>
+          <p class="subtitle">นับจำนวนเคสที่ตรงกับคีย์เวิร์ด แยกแก้ไขแล้ว/ยังไม่แก้ ย้อนหลังได้ตามช่วงวันที่ (เว้นว่าง = ทั้งหมด)</p>
+        </div>
+        <div class="card summary-header">
+          <label for="keyword-analysis-keywords">คีย์เวิร์ด:</label>
+          <input type="text" id="keyword-analysis-keywords" placeholder="กระดาษติด, ไม้กั้นไม่เปิด" style="flex:1; min-width:220px;" value="กระดาษติด, ไม้กั้นไม่เปิด" />
+          <label for="keyword-analysis-from">จากวันที่:</label>
+          <input type="date" id="keyword-analysis-from" />
+          <label for="keyword-analysis-to">ถึงวันที่:</label>
+          <input type="date" id="keyword-analysis-to" />
+          <button id="load-keyword-analysis">วิเคราะห์</button>
+          <button type="button" class="secondary" id="print-keyword-analysis-btn">🖨️ พิมพ์รายงาน</button>
+        </div>
+        <div id="keyword-analysis-result"></div>
       </div>
 
       <div id="tab-import" class="tab-panel">

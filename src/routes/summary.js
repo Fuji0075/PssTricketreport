@@ -112,6 +112,74 @@ router.get('/range', (req, res) => {
   res.json(getRangeSummaryData(from, to, company));
 });
 
+// Keyword-driven case analysis over all (or a date-ranged) ticket history:
+// how many cases matched each keyword (e.g. "กระดาษติด", "ไม้กั้นไม่เปิด" —
+// paper jam, barrier gate not opening), and how many of those are fixed
+// (status done) vs still unresolved.
+function getKeywordAnalysis(keywords, fromDate, toDate) {
+  let sql = 'SELECT * FROM tickets';
+  const clauses = [];
+  const params = [];
+  if (fromDate) {
+    clauses.push('date(created_at) >= date(?)');
+    params.push(fromDate);
+  }
+  if (toDate) {
+    clauses.push('date(created_at) <= date(?)');
+    params.push(toDate);
+  }
+  if (clauses.length) sql += ' WHERE ' + clauses.join(' AND ');
+  sql += ' ORDER BY created_at';
+  const tickets = db.prepare(sql).all(...params);
+
+  const totalCases = tickets.length;
+  const fixedCases = tickets.filter((t) => t.status === 'done').length;
+  const unresolvedCases = totalCases - fixedCases;
+
+  const keywordBreakdown = keywords.map((keyword) => {
+    const needle = keyword.trim().toLowerCase();
+    const matches = tickets.filter((t) =>
+      `${t.title} ${t.description || ''}`.toLowerCase().includes(needle)
+    );
+    return {
+      keyword,
+      count: matches.length,
+      fixedCount: matches.filter((t) => t.status === 'done').length,
+      unresolvedCount: matches.filter((t) => t.status !== 'done').length,
+      tickets: matches.map((t) => ({
+        id: t.id, title: t.title, status: t.status, company: t.company, created_at: t.created_at,
+      })),
+    };
+  });
+
+  return {
+    from: fromDate || null,
+    to: toDate || null,
+    totalCases,
+    fixedCases,
+    unresolvedCases,
+    keywordBreakdown,
+  };
+}
+
+router.get('/keywords', (req, res) => {
+  const keywords = String(req.query.keywords || '')
+    .split(',')
+    .map((k) => k.trim())
+    .filter(Boolean);
+  if (keywords.length === 0) {
+    return res.status(400).json({ error: 'keywords is required (comma-separated)' });
+  }
+  const { from, to } = req.query;
+  if (from && !/^\d{4}-\d{2}-\d{2}$/.test(from)) {
+    return res.status(400).json({ error: 'from must be in YYYY-MM-DD format' });
+  }
+  if (to && !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+    return res.status(400).json({ error: 'to must be in YYYY-MM-DD format' });
+  }
+  res.json(getKeywordAnalysis(keywords, from, to));
+});
+
 router.get('/pending', (req, res) => {
   const staleDays = Number(req.query.staleDays) || 2;
   const pending = db
@@ -128,4 +196,5 @@ router.get('/pending', (req, res) => {
 module.exports = router;
 module.exports.getDailySummaryData = getDailySummaryData;
 module.exports.getRangeSummaryData = getRangeSummaryData;
+module.exports.getKeywordAnalysis = getKeywordAnalysis;
 module.exports.todayStr = todayStr;

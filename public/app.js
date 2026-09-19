@@ -501,6 +501,109 @@ document.getElementById('load-branch-summary').addEventListener('click', loadBra
 document.getElementById('print-branch-summary-btn').addEventListener('click', () => window.print());
 loadBranchSummary();
 
+// ---- Keyword analysis (recurring-issue report: how many cases match each
+// keyword, split into fixed vs still-unresolved, over all time or a range) ----
+function buildKeywordAnalysisText(data, keywords) {
+  const rangeLine = data.from || data.to
+    ? `ช่วงวันที่ ${data.from ? formatThaiDate(data.from) : '(เริ่มต้น)'} - ${data.to ? formatThaiDate(data.to) : '(ปัจจุบัน)'}`
+    : 'ทั้งหมดทุกช่วงเวลา';
+
+  const lines = [
+    'รายงานวิเคราะห์ปัญหาซ้ำ',
+    rangeLine,
+    '',
+    `เคสทั้งหมด: ${data.totalCases} เคส`,
+    `แก้ไขแล้ว: ${data.fixedCases} เคส`,
+    `ยังแก้ไม่ได้: ${data.unresolvedCases} เคส`,
+    '',
+  ];
+
+  data.keywordBreakdown.forEach((kw) => {
+    lines.push(`คีย์เวิร์ด "${kw.keyword}" — พบ ${kw.count} เคส (แก้ไขแล้ว ${kw.fixedCount}, ยังไม่แก้ ${kw.unresolvedCount})`);
+    kw.tickets.forEach((t) => {
+      lines.push(`  - #${t.id} ${t.title} [${statusLabel[t.status] || t.status}]`);
+    });
+    lines.push('');
+  });
+
+  return lines.join('\n').trim();
+}
+
+async function loadKeywordAnalysis() {
+  const keywordsRaw = document.getElementById('keyword-analysis-keywords').value.trim();
+  const from = document.getElementById('keyword-analysis-from').value;
+  const to = document.getElementById('keyword-analysis-to').value;
+  const el = document.getElementById('keyword-analysis-result');
+  if (!keywordsRaw) {
+    el.innerHTML = '<div class="card"><div class="empty">กรุณาใส่คีย์เวิร์ดอย่างน้อย 1 คำ</div></div>';
+    return;
+  }
+
+  const params = new URLSearchParams({ keywords: keywordsRaw });
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const res = await fetch(`/api/summary/keywords?${params.toString()}`);
+  const data = await res.json();
+  if (!res.ok) {
+    el.innerHTML = `<div class="card"><div class="empty">${escapeHtml(data.error || 'เกิดข้อผิดพลาด')}</div></div>`;
+    return;
+  }
+
+  const keywords = keywordsRaw.split(',').map((k) => k.trim()).filter(Boolean);
+  const reportText = buildKeywordAnalysisText(data, keywords);
+
+  el.innerHTML = `
+    <div class="stat-grid">
+      <div class="stat"><span class="num">${data.totalCases}</span><span class="label">เคสทั้งหมด</span></div>
+      <div class="stat"><span class="num">${data.fixedCases}</span><span class="label">แก้ไขแล้ว</span></div>
+      <div class="stat"><span class="num">${data.unresolvedCases}</span><span class="label">ยังแก้ไม่ได้</span></div>
+    </div>
+    <div class="card branch-report-card">
+      <h3>📊 สรุปตามคีย์เวิร์ด</h3>
+      ${data.keywordBreakdown.map((kw) => `
+        <div class="keyword-breakdown-item">
+          <p><strong>"${escapeHtml(kw.keyword)}"</strong> — พบ ${kw.count} เคส
+            <span class="badge done">แก้ไขแล้ว ${kw.fixedCount}</span>
+            <span class="badge open">ยังไม่แก้ ${kw.unresolvedCount}</span>
+          </p>
+          ${kw.tickets.length ? `
+            <ul class="keyword-ticket-list">
+              ${kw.tickets.map((t) => `
+                <li>
+                  <span class="badge ${t.status}">${statusLabel[t.status] || t.status}</span>
+                  #${t.id} ${escapeHtml(t.title)}${t.company ? ` · ${escapeHtml(t.company)}` : ''}
+                  · ${escapeHtml(formatThaiDate(t.created_at))}
+                </li>
+              `).join('')}
+            </ul>
+          ` : '<p class="hint">ไม่พบเคสที่ตรงกับคีย์เวิร์ดนี้</p>'}
+        </div>
+      `).join('')}
+      <textarea readonly class="summary-text-output" id="keyword-analysis-text">${escapeHtml(reportText)}</textarea>
+      <div class="form-row no-print" style="margin-top:8px;">
+        <button type="button" id="copy-keyword-analysis-btn">คัดลอกข้อความ</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('copy-keyword-analysis-btn').addEventListener('click', () => {
+    const textarea = document.getElementById('keyword-analysis-text');
+    const btn = document.getElementById('copy-keyword-analysis-btn');
+    navigator.clipboard.writeText(textarea.value).then(() => {
+      const original = btn.textContent;
+      btn.textContent = '✓ คัดลอกแล้ว';
+      setTimeout(() => { btn.textContent = original; }, 1500);
+    }).catch(() => {
+      textarea.select();
+      document.execCommand('copy');
+    });
+  });
+}
+
+document.getElementById('load-keyword-analysis').addEventListener('click', loadKeywordAnalysis);
+document.getElementById('print-keyword-analysis-btn').addEventListener('click', () => window.print());
+loadKeywordAnalysis();
+
 // ---- Import ----
 document.getElementById('import-btn').addEventListener('click', async () => {
   const fileInput = document.getElementById('import-file');
