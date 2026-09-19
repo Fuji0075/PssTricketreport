@@ -519,7 +519,10 @@ function buildKeywordAnalysisText(data, keywords) {
   ];
 
   (data.branchBreakdown || []).forEach((b) => {
-    lines.push(`${b.company} — ${b.totalCases} เคส (แก้ไขแล้ว ${b.fixedCases}, ยังไม่แก้ ${b.unresolvedCases}, เป็นซ้ำ ${b.recurringCases})`);
+    lines.push(`${b.company} — ${b.totalCases} เคส (แก้ไขแล้ว ${b.fixedCases}, ยังไม่แก้ ${b.unresolvedCases}, On Hold ${b.onHoldCases}, เป็นซ้ำ ${b.recurringCases})`);
+    if (b.onHoldCases > 0) {
+      lines.push(`  งานที่พักไว้ (On Hold): ${b.onHoldTickets.map((t) => `#${t.id} ${t.title}`).join(', ')}`);
+    }
     b.keywords.forEach((k) => {
       lines.push(`  ${b.company} = ${k.keyword} = ${k.count} ครั้ง${k.recurring ? ' (เป็นซ้ำบ่อย)' : ''} — แก้ไขแล้ว ${k.fixedCount}, ยังไม่แก้ ${k.unresolvedCount}`);
       lines.push(`    เคส: ${k.tickets.map((t) => `#${t.id} ${t.title}`).join(', ')}`);
@@ -532,7 +535,10 @@ function buildKeywordAnalysisText(data, keywords) {
 
   data.keywordBreakdown.forEach((kw) => {
     lines.push(`คีย์เวิร์ด "${kw.keyword}" — พบ ${kw.count} เคส (แก้ไขแล้ว ${kw.fixedCount}, ยังไม่แก้ ${kw.unresolvedCount})`);
-    if (kw.topSolutions && kw.topSolutions.length) {
+    if (kw.consolidatedSolutions && kw.consolidatedSolutions.length) {
+      lines.push('  วิธีแก้ที่พบบ่อย (รวมกลุ่มด้วย AI):');
+      kw.consolidatedSolutions.forEach((s) => lines.push(`  - (${s.count} ครั้ง) ${s.label}`));
+    } else if (kw.topSolutions && kw.topSolutions.length) {
       lines.push('  วิธีแก้ที่พบบ่อย:');
       kw.topSolutions.forEach((s) => lines.push(`  - (${s.count} ครั้ง) ${s.solution}`));
     }
@@ -581,8 +587,12 @@ async function loadKeywordAnalysis() {
           <p><strong>${escapeHtml(b.company)}</strong> — ${b.totalCases} เคส
             <span class="badge done">แก้ไขแล้ว ${b.fixedCases}</span>
             <span class="badge open">ยังไม่แก้ ${b.unresolvedCases}</span>
-            ${b.recurringCases > 0 ? `<span class="badge on-hold">เป็นซ้ำ ${b.recurringCases}</span>` : ''}
+            ${b.onHoldCases > 0 ? `<span class="badge on-hold">On Hold ${b.onHoldCases}</span>` : ''}
+            ${b.recurringCases > 0 ? `<span class="badge in-progress">เป็นซ้ำ ${b.recurringCases}</span>` : ''}
           </p>
+          ${b.onHoldCases > 0 ? `
+            <p class="hint">⏸ งานที่พักไว้ (On Hold): ${b.onHoldTickets.map((t) => `#${t.id} ${escapeHtml(t.title)}`).join(', ')}</p>
+          ` : ''}
           <ul class="keyword-ticket-list">
             ${b.keywords.map((k) => `
               <li>
@@ -604,9 +614,16 @@ async function loadKeywordAnalysis() {
             <span class="badge done">แก้ไขแล้ว ${kw.fixedCount}</span>
             <span class="badge open">ยังไม่แก้ ${kw.unresolvedCount}</span>
           </p>
-          ${kw.topSolutions && kw.topSolutions.length ? `
+          ${kw.consolidatedSolutions && kw.consolidatedSolutions.length ? `
             <div class="top-solutions">
-              <p class="hint" style="margin:6px 0 2px;">💡 วิธีแก้ที่พบบ่อย (จากช่องรายละเอียดและบันทึกในช่องคอมเมนต์):</p>
+              <p class="hint" style="margin:6px 0 2px;">💡 วิธีแก้ที่พบบ่อย (รวมกลุ่มด้วย AI จากช่องรายละเอียด+คอมเมนต์):</p>
+              <ul class="keyword-ticket-list">
+                ${kw.consolidatedSolutions.map((s) => `<li><strong>${s.count} ครั้ง</strong> — ${escapeHtml(s.label)}</li>`).join('')}
+              </ul>
+            </div>
+          ` : kw.topSolutions && kw.topSolutions.length ? `
+            <div class="top-solutions">
+              <p class="hint" style="margin:6px 0 2px;">💡 วิธีแก้ที่พบบ่อย (จากช่องรายละเอียดและบันทึกในช่องคอมเมนต์)${data.aiAvailable === false ? ' — ตั้งค่า ANTHROPIC_API_KEY เพื่อให้ AI ช่วยรวมกลุ่มข้อความที่หมายเดียวกัน' : ''}:</p>
               <ul class="keyword-ticket-list">
                 ${kw.topSolutions.map((s) => `<li><strong>${s.count} ครั้ง</strong> — ${escapeHtml(s.solution)}</li>`).join('')}
               </ul>

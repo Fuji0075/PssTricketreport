@@ -220,12 +220,15 @@ function getKeywordAnalysis(keywords, fromDate, toDate) {
         [...kwMap.values()].flat().map((t) => [t.id, t])
       ).values()];
       const recurringKeywords = keywordCounts.filter((k) => k.recurring);
+      const onHoldTickets = uniqueTickets.filter((t) => t.status === 'on-hold');
 
       return {
         company,
         totalCases: uniqueTickets.length,
         fixedCases: uniqueTickets.filter((t) => t.status === 'done').length,
         unresolvedCases: uniqueTickets.filter((t) => t.status !== 'done').length,
+        onHoldCases: onHoldTickets.length,
+        onHoldTickets: onHoldTickets.map((t) => ({ id: t.id, title: t.title })),
         recurringCases: recurringKeywords.reduce((sum, k) => sum + k.count, 0),
         keywords: keywordCounts,
       };
@@ -243,7 +246,50 @@ function getKeywordAnalysis(keywords, fromDate, toDate) {
   };
 }
 
-router.get('/keywords', (req, res) => {
+// Raw solution notes are often the same fix worded differently ("รีเซ็ท
+// ปริ้นเตอร์", "เปิดเครื่องใหม่", "รีสตาร์ทเครื่องพิมพ์" are all "restart the
+// printer"), so an exact-string tally lists them as separate one-off
+// entries instead of the one recurring pattern they actually are. When
+// ANTHROPIC_API_KEY is set, ask Claude to cluster them into a handful of
+// canonical fixes with summed counts; otherwise this is skipped and the
+// raw per-string tally (topSolutions) is all the frontend shows.
+async function consolidateSolutions(solutions) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey || !solutions || solutions.length === 0) return null;
+
+  const listText = solutions.map((s, i) => `${i + 1}. (${s.count} ครั้ง) ${s.solution}`).join('\n');
+  const prompt = `นี่คือรายการวิธีแก้ปัญหาที่ทีมช่างซ่อมบำรุงบันทึกไว้ (แต่ละบรรทัดมีจำนวนครั้งที่มีการบันทึกข้อความนั้นแบบเป๊ะๆ):\n${listText}\n\nวิธีแก้หลายข้อข้างต้นเป็นเรื่องเดียวกันแต่พิมพ์คำต่างกัน กรุณารวมกลุ่มที่มีความหมายเดียวกันเข้าด้วยกัน แล้วตอบกลับเป็น JSON array เท่านั้น ห้ามมีข้อความอื่นนอกเหนือจาก JSON รูปแบบ:\n[{"label": "คำอธิบายวิธีแก้แบบสั้นกระชับภาษาไทย", "count": จำนวนครั้งรวมของกลุ่มนี้}]\nเรียงจากจำนวนครั้งมากไปน้อย`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-5',
+        max_tokens: 600,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    const text = (data.content || []).map((c) => c.text || '').join('').trim();
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) return null;
+    const parsed = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(parsed)) return null;
+    return parsed
+      .filter((p) => p && p.label && Number.isFinite(p.count))
+      .sort((a, b) => b.count - a.count);
+  } catch {
+    return null;
+  }
+}
+
+router.get('/keywords', async (req, res) => {
   const keywords = String(req.query.keywords || '')
     .split(',')
     .map((k) => k.trim())
@@ -258,7 +304,13 @@ router.get('/keywords', (req, res) => {
   if (to && !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
     return res.status(400).json({ error: 'to must be in YYYY-MM-DD format' });
   }
-  res.json(getKeywordAnalysis(keywords, from, to));
+
+  const data = getKeywordAnalysis(keywords, from, to);
+  for (const kw of data.keywordBreakdown) {
+    kw.consolidatedSolutions = await consolidateSolutions(kw.topSolutions);
+  }
+  data.aiAvailable = Boolean(process.env.ANTHROPIC_API_KEY);
+  res.json(data);
 });
 
 router.get('/pending', (req, res) => {
